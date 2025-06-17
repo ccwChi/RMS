@@ -1,0 +1,816 @@
+﻿/*----------共用參數------------*/
+/*#region 共用參數*/
+html, body {
+    min-height: 100vh;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 100%;
+    font-family: Arial,helvetica,sans-serif !important;
+    color: black;
+}
+
+body {
+    font-size: 1.2em;
+    font-family: Arial,helvetica,sans-serif !important;
+    -ms-overflow-style: none;
+    width: calc(100vw + 18px);
+    /*overflow: auto;*/
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+/* Hide scrollbar for Chrome, Safari and Opera */
+html::-webkit-scrollbar {
+    width: 0px;
+}
+/* Hide scrollbar for IE and Edge */
+html {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+/*#endregion*/
+/
+/*----------功能選單-----------------*/
+/*#region 功能選單列*/
+
+.navbar {
+    min-height: 25px !important;
+    margin-bottom: 3px !important;
+}
+
+.navbar .navbar-toggle {
+    margin-top: 0px;
+    margin-bottom: 0px;
+    padding: 0px 9px;
+}
+
+.navbar-default .navbar-brand {
+    color: white !important;
+}
+
+.navbar-brand {
+    font-size: 1.1em !important;
+    padding-top: 15px;
+    max-height: 25px;
+}
+
+.navbar-logo {
+    font-family: 'Shojumaru', cursive,sans-serif;
+    margin-right: 15px;
+}
+
+.header-nav {
+    background-color: #0071b2 !important;
+    padding-top: 5px;
+    font-weight: bold;
+}
+
+main-header .navbar-right {
+    font-size: 1.3em;
+}
+
+.navbar-right-icon {
+    padding-top: 3px;
+    padding-bottom: 0px;
+}
+
+    .navbar-right-icon li a .fa {
+        font-size: 1.3em;
+    }
+
+    .navbar-right-icon li a .hidden-easy {
+        font-size: 0.8em;
+    }
+
+.navbar-nav > li > a {
+    padding-top: 10px !important;
+    padding-bottom: 5px !important;
+}
+
+.nav > li > a {
+    position: relative;
+    display: block;
+    padding: 10px 15px !important;
+}
+
+.navbar-default .navbar-nav > li > a {
+    color: white !important;
+    font-size: 1.2em;
+}
+
+    .navbar-default .navbar-nav > li > a:hover,
+    .navbar-default .navbar-nav > li > a:focus {
+        background-color: #d2d2d2;
+        color: black;
+    }
+
+    .navbar-default .navbar-nav > li > a:hover,
+    .navbar-default .navbar-nav > li > a:focus {
+        background-color: white !important;
+        color: black !important;
+    }
+
+.nav-tabs {
+    /*height: 42px;*/
+    font-size: 1.0em;
+}
+
+.icon-bar {
+    margin: 4px !important;
+    background-color: white !important;
+}
+
+
+
+
+/*--下拉選單  增加下拉式選單子選單css--*/
+.dropdown-submenu {
+    position: relative;
+}
+
+    .dropdown-submenu > .dropdown-menu {
+        top: 0;
+        left: 100%;
+        margin-top: -6px;
+        margin-left: -1px;
+        -webkit-border-radius: 0 6px 6px 6px;
+        -moz-border-radius: 0 6px 6px;
+        border-radius: 0 6px 6px 6px;
+    }
+
+    .dropdown-submenu:hover > .dropdown-menu {
+        display: block;
+    }
+
+    .dropdown-submenu > a:after {
+        display: block;
+        content: " ";
+        float: right;
+        width: 0;
+        height: 0;
+        border-color: transparent;
+        border-style: solid;
+        border-width: 5px 0 5px 5px;
+        border-left-color: #ccc;
+        margin-top: 5px;
+        margin-right: -10px;
+    }
+
+    .dropdown-submenu:hover > a:after {
+        border-left-color: #fff;
+    }
+
+    .dropdown-submenu.pull-left {
+        float: none;
+    }
+
+        .dropdown-submenu.pull-left > .dropdown-menu {
+            left: -100%;
+            margin-left: 10px;
+            -webkit-border-radius: 6px 0 6px 6px;
+            -moz-border-radius: 6px 0 6px 6px;
+            border-radius: 6px 0 6px 6px;
+        }
+
+    .dropdown-submenu > .dropdown-menu-right {
+        top: 0;
+        left: -100%;
+        right: 100%;
+        margin-top: -6px;
+        margin-left: -1px;
+        -webkit-border-radius: 0 6px 6px 6px;
+        -moz-border-radius: 0 6px 6px;
+        border-radius: 0 6px 6px 6px;
+    }
+
+    .dropdown-submenu.pull-left {
+        float: left;
+    }
+
+        .dropdown-submenu.pull-left > .dropdown-menu-right {
+            right: 100%;
+            left: -100%;
+            margin-left: -10px;
+            -webkit-border-radius: 6px 0 6px 6px;
+            -moz-border-radius: 6px 0 6px 6px;
+            border-radius: 6px 0 6px 6px;
+        }
+
+/*#endregion*/
+
+
+
+/*----------提示選單-----------------*/
+/*#region 提示鈴鐺 -- 下拉選單*/
+.dropdown-submenu {
+    position: relative;
+}
+
+    .dropdown-submenu > .bell-menu {
+        top: 0;
+        left: 100%;
+        margin-top: -6px;
+        margin-left: -1px;
+        -webkit-border-radius: 0 6px 6px 6px;
+        -moz-border-radius: 0 6px 6px;
+        border-radius: 0 6px 6px 6px;
+    }
+
+    .dropdown-submenu:hover > .bell-menu {
+        display: block;
+    }
+
+    .dropdown-submenu > a:after {
+        display: block;
+        content: " ";
+        float: right;
+        width: 0;
+        height: 0;
+        border-color: transparent;
+        border-style: solid;
+        border-width: 5px 0 5px 5px;
+        border-left-color: #ccc;
+        margin-top: 5px;
+        margin-right: -10px;
+    }
+
+    .dropdown-submenu:hover > a:after {
+        border-left-color: #fff;
+    }
+
+    .dropdown-submenu.pull-left {
+        float: none;
+    }
+
+        .dropdown-submenu.pull-left > .bell-menu {
+            left: -100%;
+            margin-left: 10px;
+            -webkit-border-radius: 6px 0 6px 6px;
+            -moz-border-radius: 6px 0 6px 6px;
+            border-radius: 6px 0 6px 6px;
+        }
+
+    .dropdown-submenu > .bell-menu-right {
+        top: 0;
+        left: -100%;
+        right: 100%;
+        margin-top: -6px;
+        margin-left: -1px;
+        -webkit-border-radius: 0 6px 6px 6px;
+        -moz-border-radius: 0 6px 6px;
+        border-radius: 0 6px 6px 6px;
+    }
+
+    .dropdown-submenu.pull-left {
+        float: left;
+    }
+
+        .dropdown-submenu.pull-left > .bell-menu-right {
+            right: 100%;
+            left: -100%;
+            margin-left: -10px;
+            -webkit-border-radius: 6px 0 6px 6px;
+            -moz-border-radius: 6px 0 6px 6px;
+            border-radius: 6px 0 6px 6px;
+        }
+/*#endregion*/
+
+@-webkit-keyframes shake {
+    0% {
+        -webkit-transform: translate(2px, 1px) rotate(0deg);
+    }
+
+    10% {
+        -webkit-transform: translate(-1px, -2px) rotate(-1deg);
+    }
+
+    20% {
+        -webkit-transform: translate(-3px, 0px) rotate(1deg);
+    }
+
+    30% {
+        -webkit-transform: translate(0px, 2px) rotate(0deg);
+    }
+
+    40% {
+        -webkit-transform: translate(1px, -1px) rotate(1deg);
+    }
+
+    50% {
+        -webkit-transform: translate(-1px, 2px) rotate(-1deg);
+    }
+
+    60% {
+        -webkit-transform: translate(-3px, 1px) rotate(0deg);
+    }
+
+    70% {
+        -webkit-transform: translate(2px, 1px) rotate(-1deg);
+    }
+
+    80% {
+        -webkit-transform: translate(-1px, -1px) rotate(1deg);
+    }
+
+    90% {
+        -webkit-transform: translate(2px, 2px) rotate(0deg);
+    }
+
+    100% {
+        -webkit-transform: translate(1px, -2px) rotate(-1deg);
+    }
+}
+
+/*---------上方縮放Panel----------------*/
+/*#region 上方縮放panel*/
+.bs-panel-default > .bs-panel-heading {
+    background-color: transparent;
+    border: medium none;
+    border-radius: 0;
+    color: inherit;
+    padding: 0;
+    position: relative;
+    font: solid 1px;
+}
+
+.bs-panel-default > .bs-panel-title {
+    margin: 0px;
+}
+
+.bs-panel-heading .bs-panel-title > a {
+    background-color: #87C540;
+    border: medium none;
+    color: #ffffff;
+    display: block;
+    font-family: Arial,Helvetica,sans-serif;
+    line-height: 23px;
+    padding: 0px 65px 0px 40px;
+    word-wrap: break-word;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+    .bs-panel-heading .bs-panel-title > a::after {
+        bottom: 0;
+        content: "▲";
+        font-family: "Roboto",sans-serif;
+        font-size: 1.0em;
+        font-weight: 300;
+        letter-spacing: -1px;
+        line-height: 23px;
+        position: absolute;
+        right: 3%;
+        text-align: center;
+        top: 0;
+        width: 60px;
+    }
+
+    .bs-panel-heading .bs-panel-title > a.collapsed::after {
+        content: "▼";
+    }
+
+.bs-panel-body {
+    padding: 1px 15px 1px 5px;
+    height: 200px;
+    width: 100%;
+    overflow: auto;
+    background-color: #F5F5F5;
+    font-size: 1.0em;
+    display: inline-block;
+    margin: 0px;
+    border: 0.5px solid #808080;
+}
+/*#endregion 上方縮放panel*/
+
+/*--------內容--------------------------*/
+/*#region 內容*/
+#body-container {
+    margin: 0px;
+    padding: 0px;
+    font-size: 1.0em;
+    width: 100%;
+    height: 100vh;
+}
+
+#submenu {
+    min-width: 200px;
+    padding: 0px;
+    background-color: #F2F2F2;
+}
+
+#header-toolbar {
+    width: 100%;
+    height: 80px;
+    border: 0.5px solid #808080;
+    margin-bottom: 15px;
+    padding: 3px;
+}
+
+#body-content {
+    padding: 0px;
+    margin: 0px;
+    background: white;
+}
+
+#content-top {
+}
+
+#content-grid {
+    border: 0.5px solid #808080;
+    background-color: #d2d2d2;
+}
+
+#content-grid-bottom {
+    padding: 3px 0px 0px 0px;
+    width: 100%;
+    border: 0.5px solid #808080;
+    background-color: #d2d2d2;
+}
+/*
+#content-form {
+    box-shadow: 3px 3px 1px rgba(0, 0, 0, 0.2);
+}*/
+/*#endregion*/
+
+/*------------easyUI--------------------*/
+/*#region easyUi元件自訂*/
+.grid-height-auto {
+    width: auto;
+    height: auto;
+}
+
+.grid-height-all {
+    width: auto;
+    height: 100%;
+}
+
+.datagrid {
+    padding: 0px;
+}
+
+.separatorbar {
+    margin-right: 30px;
+}
+
+.easyui-linkbutton {
+    width: 58px;
+    font-size: 12px;
+    font-weight: bold;
+    margin: 0px;
+    padding: 0px;
+}
+
+.l-btn-text {
+    font-size: 1.1em !important;
+}
+
+.header-toolbar .linkbtn2 {
+    width: 65px;
+}
+
+.form-control {
+    padding-left: 6px !important;
+}
+/*#endregion*/
+
+@media (max-width: 1600px) {
+    html {
+        font-size: 1.0em !important;
+    }
+
+    body{
+        font-size:1.0em !important;
+    }
+
+    .container-fluid {
+        padding-left: 5px !important;
+    }
+
+    .navbar-nav > li > a {
+        padding-top: 8px !important;
+        padding-bottom: 2px !important;
+    }
+
+    .navbar-default .navbar-nav > li > a {       
+        font-size: 1.1em;
+    }
+
+    .navbar-header .navbar-brand {
+        padding-top: 8px !important;
+        margin-right: 0px !important;
+    }
+
+    .navbar {
+        min-height: 35px !important;
+        margin-bottom: 2px;
+    }
+
+    .navbar-brand {
+        padding-top: 8px !important;
+        max-height: 25px !important;
+    }
+
+    .bs-panel-heading .bs-panel-title > a {
+        line-height: 15px;
+    }
+
+        .bs-panel-heading .bs-panel-title > a::after {
+            font-size: 1.0em;
+            line-height: 15px;
+            width: 40px;
+        }
+
+    .bs-panel-body {
+        padding: 1px 5px -4px 2px;
+        height: 200px;
+        font-size: 1.0em;
+    }
+
+
+    .l-btn-large {
+        width: 40px !important;
+        height: 42px !important;
+    }
+
+    .header-toolbar .l-btn-icon {
+        margin-left: -12px !important;
+        width: 20px !important;
+        height: 20px !important;
+    }
+
+    .l-btn-text {
+        margin-top: 23px !important;
+        margin-left: 0px !important;
+        margin-right: 2px !important;
+        font-size: 1em !important;
+    }
+
+
+    .header-toolbar .linkbtn2 {
+        width: 65px !important;
+        height: 45px !important;
+    }
+
+    .textbox-text, .form-control {
+        font-size: 0.9em !important;
+    }
+
+    .l-btn-icon {
+        top: 40%;
+    }
+}
+
+
+
+
+/*-----字體顏色-----------*/
+/*#region 字體顏色*/
+.text-red {
+    color: #dd4b39 !important;
+}
+
+.text-yellow {
+    color: #f39c12 !important;
+}
+
+.text-aqua {
+    color: #00c0ef !important;
+}
+
+.text-blue {
+    color: #0073b7 !important;
+}
+
+.text-black {
+    color: #111111 !important;
+}
+
+.text-light-blue {
+    color: #3c8dbc !important;
+}
+
+.text-green {
+    color: #00a65a !important;
+}
+
+.text-gray {
+    color: #d2d6de !important;
+}
+
+.text-navy {
+    color: #001f3f !important;
+}
+
+.text-teal {
+    color: #39cccc !important;
+}
+
+.text-olive {
+    color: #3d9970 !important;
+}
+
+.text-lime {
+    color: #01ff70 !important;
+}
+
+.text-orange {
+    color: #ff851b !important;
+}
+
+.text-fuchsia {
+    color: #f012be !important;
+}
+
+.text-purple {
+    color: #605ca8 !important;
+}
+
+.text-maroon {
+    color: #d81b60 !important;
+}
+
+.text-white {
+    color: #fff !important;
+}
+/*2021-10-20 by俊涵新增顏色*/
+/*黃綠*/
+.text-yellowgreen {
+    color: #b6eb30 !important;
+}
+/*藍綠*/
+.text-bluegreen {
+    color: #1af8bb !important;
+}
+/*亮黃*/
+.text-yellowlight {
+    color: #ecee4f !important;
+}
+/*深紅*/
+.text-reddeep {
+    color: #e5575f !important;
+}
+/*深紫*/
+.text-purpledeep {
+    color: #8c75ed !important;
+}
+/*褐色*/
+.text-brown {
+    color: #c14343 !important;
+}
+/*褐黃*/
+.text-brownyellow {
+    color: #e0c524 !important;
+}
+/*褐綠色*/
+.text-browngreen {
+    color: #a1c143 !important;
+}
+/*米色*/
+.text-beige {
+    color: #e1e5ab !important;
+}
+/*米綠色*/
+.text-beigegreen {
+    color: #b3e5ab !important;
+}
+/*米藍色*/
+.text-beigeblue {
+    color: #abe5e0 !important;
+}
+/*米紫色*/
+.text-beigepurple {
+    color: #c1abe5 !important;
+}
+/*米粉色*/
+.text-beigepink {
+    color: #e5abdd !important;
+}
+
+/*#endregion */
+/*-----背景顏色-----------*/
+/*#region 背景顏色*/
+.bg-red {
+    background-color: #dd4b39 !important;
+}
+
+.bg-yellow {
+    background-color: #f39c12 !important;
+}
+
+.bg-aqua {
+    background-color: #00c0ef !important;
+}
+
+.bg-blue {
+    background-color: #0073b7 !important;
+}
+
+.bg-black {
+    background-color: #111111 !important;
+}
+
+.bg-light-blue {
+    background-color: #3c8dbc !important;
+}
+
+.bg-green {
+    background-color: #00a65a !important;
+}
+
+.bg-gray {
+    background-color: #d2d6de !important;
+}
+
+.bg-navy {
+    background-color: #001f3f !important;
+}
+
+.bg-teal {
+    background-color: #39cccc !important;
+}
+
+.bg-olive {
+    background-color: #3d9970 !important;
+}
+
+.bg-lime {
+    background-color: #01ff70 !important;
+}
+
+.bg-orange {
+    background-color: #ff851b !important;
+}
+
+.bg-fuchsia {
+    background-color: #f012be !important;
+}
+
+.bg-purple {
+    background-color: #605ca8 !important;
+}
+
+.bg-maroon {
+    background-color: #d81b60 !important;
+}
+/*2021-10-20 by俊涵新增顏色*/
+/*黃綠*/
+.bg-yellowgreen {
+    background-color: #b6eb30 !important;
+}
+/*藍綠*/
+.bg-bluegreen {
+    background-color: #1af8bb !important;
+}
+/*亮黃*/
+.bg-yellowlight {
+    background-color: #ecee4f !important;
+}
+/*深紅*/
+.bg-reddeep {
+    background-color: #e5575f !important;
+}
+/*深紫*/
+.bg-purpledeep {
+    background-color: #8c75ed !important;
+}
+/*褐色*/
+.bg-brown {
+    background-color: #c14343 !important;
+}
+/*褐黃*/
+.bg-brownyellow {
+    background-color: #e0c524 !important;
+}
+/*褐綠色*/
+.bg-browngreen {
+    background-color: #a1c143 !important;
+}
+/*米色*/
+.bg-beige {
+    background-color: #e1e5ab !important;
+}
+/*米綠色*/
+.bg-beigegreen {
+    background-color: #b3e5ab !important;
+}
+/*米藍色*/
+.bg-beigeblue {
+    background-color: #abe5e0 !important;
+}
+/*米紫色*/
+.bg-beigepurple {
+    background-color: #c1abe5 !important;
+}
+/*米粉色*/
+.bg-beigepink {
+    background-color: #e5abdd !important;
+}
+
+/**/
+.bg-waterblue {
+    background-color: #009abd !important;
+}
+/*#endregion */

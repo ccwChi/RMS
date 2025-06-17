@@ -1,0 +1,267 @@
+﻿@{
+    ViewBag.Title = "權限群組管理";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+@section css {
+    <link rel="stylesheet" href="@Href("~/Scripts/base/easyui/themes/icon.css")" />
+    <link rel="stylesheet" href="@Href("~/Scripts/base/easyui/themes/bootstrap/easyui.css")" />
+}
+
+<h2>權限角色設定</h2>
+
+<table id="roleGrid" class="easyui-datagrid" style="width:100%;">
+    <thead>
+        <tr>
+            <th data-options="field:'RoleId',width:20,align:'left'">序號</th>
+            <th data-options="field:'RoleName',width:80,align:'left'">群組名稱</th>
+            <th data-options="field:'Description',width:80,align:'left'">描述</th>
+            <th data-options="field:'Permissions',width:250, align:'left'">權限功能</th>
+            <th data-options="field:'IsActive',width:40, align:'left'">是否啟用</th>
+        </tr>
+    </thead>
+</table>
+
+<div id="toolbar" style="padding:5px;">
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="openDialog()">新增</a>
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-edit" onclick="editDialog()">編輯</a>
+
+</div>
+
+<!-- 新增/編輯 Dialog -->
+<div id="dlg" class="easyui-dialog" style="width:400px" closed="true" buttons="#dlg-buttons" modal="true">
+    <form id="roleForm" method="post" style="padding:10px">
+        <input type="hidden" name="RoleId" id="RoleId" />
+        <div style="margin-bottom:10px">
+            <label>群組名稱：</label>
+            <input name="RoleName" class="easyui-textbox" required="true" style="width:100%" />
+        </div>
+        <div style="margin-bottom:10px">
+            <label>描述：</label>
+            <input name="Description" class="easyui-textbox" multiline="true" style="width:100%" />
+        </div>
+        <div style="margin-bottom:10px">
+            <label>是否啟用：</label>
+            <input type="checkbox" name="IsActive" id="IsActive" /> 啟用
+        </div>
+        <div>
+            <label>權限功能：</label>
+            <div id="permissionList" style="max-height:120px; overflow-y:auto; padding:5px; border:1px solid #ddd;"></div>
+        </div>
+    </form>
+</div>
+<div id="dlg-buttons">
+    <a href="javascript:void(0)" class="easyui-linkbutton" onclick="saveRole()">儲存</a>
+    <a href="javascript:void(0)" class="easyui-linkbutton" onclick="$('#dlg').dialog('close')">取消</a>
+</div>
+
+@section Scripts {
+    <script src="~/Scripts/base/easyui/jquery.easyui.min.js"></script>
+    <script>
+        // 全域陣列，之後用來存放 GetAllPermissions 回來的資料
+        let permissionOptions = [];
+
+        // 頁面 ready 時，先同步向後端拿 Permissions
+        $(function () {
+            $.ajax({
+                url: '@Url.Action("GetAllPermissions", "Permission")',
+                method: 'GET',
+                dataType: 'json',
+                async: false, // 同步方式，確保 permissionOptions 先拿到
+                success: function (res) {
+                    if (res.success) {
+                        // 一定要用 res.data，不能用 data
+                        permissionOptions = res.data.map(p => ({ id: p.PermissionId, name: p.PermissionName }));
+                    } else {
+                        alert('無法載入權限功能清單');
+                    }
+                },
+                error: function () {
+                    alert('無法載入權限功能清單');
+                }
+            });
+
+            $('#roleGrid').datagrid({
+                url: '@Url.Action("GetRoles","Permission")',
+                method: 'get',
+                toolbar: '#toolbar',
+                fitColumns: true,
+                singleSelect: true,
+                loadFilter: function(response) {
+                    return {
+                        total: response.count,
+                        rows:   response.data
+                    };
+                },
+                columns: [[
+                    { field: 'RoleId', title: '序號', width: 20, align: 'left', formatter: (v, r, i) => i + 1 },
+                    {
+                        field: 'IsActive', title: '是否啟用', width: 80, align: 'center',
+                        formatter: function (v) {
+                            return v
+                                ? '<i class="fa fa-check" style="color:green;"></i>'
+                                : '<i class="fa fa-times" style="color:red;"></i>';
+                        }
+                    },
+                    { field: 'RoleName', title: '角色名稱', width: 80, align: 'left' },
+                    { field: 'Description', title: '描述', width: 80, align: 'left' },
+                    { field: 'Permissions', title: '權限功能', width: 250, align: 'left', formatter: formatPermissions }
+                ]]
+            });
+        });
+
+
+        function formatPermissions(value, row, index) {
+            if (!value) return "";
+            return value
+                .split(',')
+                .map(idStr => {
+                    const id = parseInt(idStr.trim(), 10);
+                    const p = permissionOptions.find(x => x.id === id);
+                    return p ? p.name : "";           // 找不到就回空字串
+                })
+                .filter(name => name)                  // 過濾掉空字串
+                .join(', ');                           // 組成 "缺陷管理, 觀看/修改參數紀錄表"
+        }
+
+
+        // 根據 permissionOptions 產生 checkbox，selected 陣列裡的 id 會被打勾
+        function renderPermissionCheckboxes(selected = []) {
+            const container = $('#permissionList');
+            container.empty();
+            permissionOptions.forEach(p => {
+                const checked = selected.includes(p.id) ? 'checked' : '';
+                container.append(`
+                    <label style="display:block;">
+                        <input type="checkbox" name="permissions" value="${p.id}" ${checked}> ${p.name}
+                    </label>
+                `);
+            });
+        }
+
+        function openDialog() {
+            $('#dlg').dialog('open').dialog('setTitle', '新增權限群組');
+            $('#roleForm').form('clear');
+            renderPermissionCheckboxes([]); // 新增時不打勾任何項目
+        }
+
+        function editDialog() {
+            const row = $('#roleGrid').datagrid('getSelected');
+            if (!row) return;
+
+            $.ajax({
+                url: '@Url.Action("GetRole", "Permission")',
+                method: 'GET',
+                dataType: 'json',
+                data: { id : row.RoleId },
+                success: function (response) {
+                    if (!response.success) {
+                        alert('讀取角色資料失敗');
+                        return;
+                    }
+
+                    const roleObj = response.data;
+                    $('#dlg').dialog('open').dialog('setTitle', '編輯權限群組');
+
+                    // 載入 RoleId, RoleName, Description
+                    $('#roleForm').form('load', {
+                        RoleId: roleObj.RoleId,
+                        RoleName: roleObj.RoleName,
+                        Description: roleObj.Description,
+                    });
+
+                    $('#IsActive').prop('checked', roleObj.IsActive);
+
+                    // 把 "1,3" 這種逗號字串拆成 [1,3]
+                    let selectedPermissions = [];
+                    if (roleObj.Permissions && roleObj.Permissions.length > 0) {
+                        selectedPermissions = roleObj.Permissions
+                            .split(',')
+                            .map(s => parseInt(s.trim(), 10))
+                            .filter(n => !isNaN(n));
+                    }
+                    renderPermissionCheckboxes(selectedPermissions);
+                },
+                error: function () {
+                    alert('讀取角色資料失敗');
+                }
+            });
+        }
+
+        function saveRole() {
+            // 1. 先把 form 裡除了勾選框以外的欄位一併抓出來
+            const formData = $('#roleForm').serializeArray();
+            // formData → 例如 [{ name:"RoleId", value:"7" }, { name:"RoleName", value:"工程" }, { name:"Description", value:"123" }]
+            // 注意：不會包含 <input type="checkbox" name="permissions"> 這些勾選框，因為我們稍後手動處理它們。
+
+            // 2. 先自行處理「是否啟用」那顆 checkbox
+            //    當 #IsActive 被打勾時，IsActive=true，否則 false
+            const IsActiveValue = $('#IsActive').is(':checked');
+
+            // 3. 再拿一次所有被打勾的權限 checkbox，轉成 int 陣列，再 join 為逗號字串
+            const permissionsArray = $('input[name="permissions"]:checked')
+                .map(function () {
+                    return parseInt(this.value, 10);
+                })
+                .get();
+            const permissionsCsv = permissionsArray.join(','); // e.g. "1,3,5"
+
+            // 4. 把 formData（純文字欄位）轉成我們要送給後端的 payload
+            const payload = {};
+            formData.forEach(f => {
+                if (f.name === 'permissions') {
+                    return; // 跳過，不把這筆塞到 payload
+                }
+                payload[f.name] = f.value;
+            });
+
+            payload.IsActive  = IsActiveValue;
+            payload.Permissions = permissionsCsv;
+
+            $.ajax({
+                url: '@Url.Action("SaveRole", "Permission")',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function (res) {
+                    if (res.success) {
+                        $('#dlg').dialog('close');
+                        $('#roleGrid').datagrid('reload');
+                    } else {
+                        alert(res.message || '儲存失敗');
+                    }
+                },
+                error: function () {
+                    alert('儲存角色時發生錯誤');
+                }
+            });
+        }
+
+
+        function deleteRole() {
+            const row = $('#roleGrid').datagrid('getSelected');
+            if (!row) return;
+
+            if (confirm('確定要刪除此角色嗎？')) {
+                $.ajax({
+                    url: '@Url.Action("Delete", "Permission")',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ id: row.RoleId }),
+                    success: function (res) {
+                        if (res.success) {
+                            $('#roleGrid').datagrid('reload');
+                        } else {
+                            alert(res.message || '刪除失敗');
+                        }
+                    },
+                    error: function () {
+                        alert('刪除角色時發生錯誤');
+                    }
+                });
+            }
+        }
+    </script>
+}
+
+

@@ -1,0 +1,268 @@
+﻿@{
+    ViewBag.Title = "參數定義管理";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+@section css {
+    <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/icon.css")" />
+    <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/bootstrap/easyui.css")" />
+}
+
+<h2>參數定義管理</h2>
+
+<table id="paramGrid" class="easyui-datagrid" style="width:100%;">
+    <thead>
+        <tr>
+            <th data-options="field:'Index',width:40">#</th>
+            <th data-options="field:'SectionCode',width:80">工段</th>
+            <th data-options="field:'ParamName',width:120">參數名稱</th>
+            <th data-options="field:'Unit',width:60">單位</th>
+            <th data-options="field:'SequenceNo',width:60">序列</th>
+            <th data-options="field:'CreateBy',width:100">建立人</th>
+            <th data-options="field:'CreateDate',width:100">建立日期</th>
+            <th data-options="field:'IsActive',width:60,align:'center',formatter:formatActive">是否啟用</th>
+        </tr>
+    </thead>
+</table>
+
+
+<div id="toolbar" style="margin:10px 0;">
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="openParamDialog(0)">
+        新增
+    </a>
+</div>
+
+<!-- 新增／編輯 Dialog -->
+<div id="paramDlg" class="easyui-dialog" style="width:400px" closed="true" buttons="#paramDlg-buttons" modal="true">
+    <form id="paramForm" method="post" style="padding:10px">
+        <input type="hidden" name="ParamId" id="ParamId" />
+
+        <div style="margin-bottom:8px">
+            <label style="display:inline-block;width:80px">參數名稱：</label>
+            <input name="ParamName" id="ParamName" class="easyui-textbox" required="true" style="width:300px" />
+        </div>
+
+        <div style="margin-bottom:8px">
+            <label style="display:inline-block;width:80px">單位：</label>
+            <input name="Unit" id="Unit" class="easyui-combobox" style="width:200px" />
+        </div>
+
+        <div style="margin-bottom:8px">
+            <label style="display:inline-block;width:80px">工段：</label>
+            <input name="SectionCode" id="SectionCode" class="easyui-combobox"
+                   style="width:200px" required="true" />
+        </div>
+
+        <div style="margin-bottom:8px">
+            <label style="display:inline-block;width:80px">自訂序列：</label>
+            <input name="SequenceNo" id="SequenceNo"
+                   class="easyui-numberbox"
+                   data-options="min:0"
+                   style="width:80px" value="0" />
+        </div>
+
+        <div style="margin-bottom:10px">
+            <label>是否啟用：</label>
+            <input type="checkbox" name="IsActive" id="IsActive" /> 啟用
+        </div>
+    </form>
+</div>
+
+<div id="paramDlg-buttons">
+    <a href="javascript:void(0)" class="easyui-linkbutton" onclick="saveParamDefinition()">儲存</a>
+    <a href="javascript:void(0)" class="easyui-linkbutton" onclick="$('#paramDlg').dialog('close')">取消</a>
+</div>
+
+@section Scripts {
+    <script src="~/Scripts/base/easyui/jquery.easyui.min.js"></script>
+    <script>
+    var machineList = [];
+    const sectionList = [
+        { value: 'I', text: '射出' },
+        { value: 'CL', text: '清洗' },
+        { value: 'NC', text: 'CNC' },
+        { value: 'AS', text: '航太' },
+        { value: 'MOLD', text: '模具' }
+        ];
+
+    const unitList = [
+        { value: '℃', text: '℃' },
+        { value: 'N/A', text: 'N/A' }
+        ]
+
+    $(function () {
+      // 1) 同步載入機台清單
+      $.ajax({
+        url: '@Url.Action("GetMachineList", "MachineManage")',
+        method: 'GET',
+        dataType: 'json',
+        async: false,
+        success: function (res) {
+          if (res.success) {
+            machineList = res.data;
+          } else {
+            $.messager.alert('錯誤', '無法載入機台清單');
+          }
+        },
+        error: function () {
+          $.messager.alert('錯誤', '無法載入機台清單');
+        }
+      });
+
+        // 初始化「工段」Combobox
+        $('#SectionCode').combobox({
+            //panelHeight: 'auto',
+            valueField: 'value',
+            textField: 'text',
+            data: sectionList
+        });
+
+        // 初始化「Unit」Combobox
+        $('#Unit').combobox({
+            //panelHeight: 'auto',
+            valueField: 'value',
+            textField: 'text',
+            data: unitList
+        });
+
+      // 3) 初始化 DataGrid
+        $('#paramGrid').datagrid({
+        url: '@Url.Action("GetParameterList", "Param")',
+        method: 'get',
+        toolbar: '#toolbar',
+        fitColumns: true,
+        singleSelect: true,
+            loadFilter: function (res) {
+                return {
+                    total: res.total,
+                    rows: res.data
+                };
+        },
+        columns: [[
+            { field: 'Index', title: '#', width: 40,  align: 'center' },
+            {
+                field: 'SectionCode',
+                title: '工段',
+                width: 80,
+                align: 'center',
+                formatter: function (v) {
+                const item = sectionList.find(x => x.value === v);
+                return item ? item.text : v;
+            }
+            },
+            { field: 'ParamName', title: '參數名稱', width: 120, align: 'left' },
+            { field: 'Unit', title: '單位', width: 60, align: 'left' },
+            { field: 'SequenceNo', title: '序列', width: 60, align: 'left' },
+            { field: 'CreateBy', title: '建立人', width: 100, align: 'left' },
+            { field: 'CreateDate', title: '建立日期', width: 100, align: 'left' },
+            {
+                field: 'IsActive', title: '是否啟用', width: 80, align: 'center',
+                formatter: function (v) {
+                    return v
+                        ? '<i class="fa fa-check" style="color:green;"></i>'
+                        : '<i class="fa fa-times" style="color:red;"></i>';
+                }
+            },
+            {
+                field: 'action', title: '編輯', width: 80, align: 'center',
+                formatter: function (_, row) {
+                    return `<a href="javascript:void(0)" onclick="openParamDialog(${row.ParamId})">編輯</a>`;
+                }
+            },
+        ]],
+        onDblClickRow: function (_, row) {
+          openParamDialog(row.ParamId);
+            }
+        })
+
+
+    });
+        // 格式化：IsActive → 綠色勾勾 or 空白
+    function formatActive(value, row, index) {
+        return value
+            ? '<i class="fa fa-check" style="color: green;"></i>'
+            : '';
+    }
+
+    // 打開「新增／編輯」Dialog
+    function openParamDialog(paramId) {
+      // 先清 form
+      $('#paramForm').form('clear');
+      // 重新載入機台下拉選項
+      //$('#SuitableMachine').combobox('loadData', machineList);
+
+        if (paramId === 0) {
+        // 新增
+        $('#ParamId').val(0);
+        $('#IsActive').prop('checked', true);
+        $('#paramDlg')
+          .dialog('setTitle', '新增參數定義')
+          .dialog('open');
+      } else {
+          // 編輯：先讀單筆
+
+        $.ajax({
+          url: '@Url.Action("GetParam", "Param")',
+          method: 'GET',
+          dataType: 'json',
+          data: { paramId: paramId },
+            success: function (response) {
+                if (!response.success) {
+                    $.messager.alert('錯誤', response.message || '讀取參數定義失敗');
+                    return;
+                }
+                var d = response.data;    // 一定要用 response.data 而不是 res.data
+
+                // 載入文字欄位
+                $('#paramForm').form('load', {
+                    ParamId: d.ParamId,
+                    ParamName: d.ParamName,
+                    Unit: d.Unit,
+                    SectionCode: d.SectionCode,
+                    SequenceNo: d.SequenceNo,
+                });
+                $('#IsActive').prop('checked', !!d.IsActive);
+
+                $('#paramDlg')
+                    .dialog('setTitle', '編輯參數定義')
+                    .dialog('open');
+            },
+          error: function() {
+            $.messager.alert('錯誤', '讀取參數定義時發生錯誤');
+          }
+        });
+      }
+    }
+
+
+    // 儲存（新增 / 更新）
+    function saveParamDefinition() {
+      // 1. 拿 form 字段
+      var formData = $('#paramForm').serializeArray();
+      var payload = {};
+      formData.forEach(f => payload[f.name] = f.value);
+
+      // 3. 處理 checkbox      // 4. 呼叫 API
+      payload.IsActive = $('#IsActive').is(':checked');
+
+      // 4. 呼叫 API
+      $.ajax({
+        url: '@Url.Action("SaveParamDefinition", "Param")',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        success: function (res) {
+          if (res.success) {
+            $('#paramDlg').dialog('close');
+            $('#paramGrid').datagrid('reload');
+          } else {
+            $.messager.alert('錯誤', res.message);
+          }
+        },
+        error: function () {
+          $.messager.alert('錯誤', '儲存時發生問題');
+        }
+      });
+    }
+    </script>
+}

@@ -1,0 +1,35 @@
+﻿(function ($) {
+    $.fn.maindg = function () {
+        return this.each(function () {
+            let cols = maindg_columnsSet();
+            $(this).datagrid({
+                columns: cols,
+                rownumbers: true, singleSelect: true, remoteSort: false, autoRowHeight: false,
+                onSelect: function (index, row) {
+                    if (actionstate == 'add' || actionstate == 'edit') {
+                        if (index != maindgindex) {
+                            maindg.datagrid('unselectRow', index);
+                            $.messager.alert('alert', '資料尚未儲存,請先存檔!');
+                        }
+                    } else {
+                        maindgindex = index;                        
+                        fieldStateSet('select', row);
+                        btnStateSet('select', row);
+                    }                    
+                },
+                onBeforeSortColumn: function (sort, order) {
+                    if (actionstate == 'add' || actionstate == 'edit') {
+                        return false;
+                    } else {
+                        actionstate = 'default';
+                        btnStateSet(actionstate, null);
+                        fieldStateSet(actionstate, null);
+                    }
+                },
+                rowStyler: maindg_rowStyler
+            })
+        })
+    };
+    $.parser.plugins.push('maindg');
+})(jQuery);
+

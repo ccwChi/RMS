@@ -1,0 +1,16 @@
+﻿@{
+    Layout = null;
+    var details = Model.rows; // 從 JsonResult 直接輸出 rows
+}
+<table class="easyui-datagrid" style="width:100%"
+       data-options="
+         singleSelect:true,
+         fitColumns:true,
+         loadFilter: function(data){ return { total: data.total, rows: data.rows }; }">
+    <thead>
+        <tr>
+            <th data-options="field:'ParamName',title:'參數',width:200">參數</th>
+            <th data-options="field:'ParamValue',title:'數值',width:100">數值</th>
+        </tr>
+    </thead>
+</table>

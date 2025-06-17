@@ -1,0 +1,179 @@
+﻿@using RecipeManageSystem.Generic
+@{
+    var isDev = HttpContext.Current.IsDebuggingEnabled;
+    var globalUrl = HttpContext.Current.Application["GlobalUrl"]?.ToString() ?? "/";
+    var defaultUrl = isDev ? "" : globalUrl;
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gudeng MES System</title>
+    <link rel="stylesheet" href="@defaultUrl/Scripts/base/bootstrap/bootstrap4.css" />
+    <link rel="stylesheet" href="@defaultUrl/Scripts/base/font-awesome/css/font-awesome.css" />
+    <link rel="stylesheet" href="@defaultUrl/Content/Site.css?v=0.21" />
+
+    @RenderSection("css", required: false)
+</head>
+<style>
+    .easyui-layout {
+        width: 100%;
+        min-height: calc(100vh - 95px);
+    }
+
+    .easyui-datagrid {
+        min-height: 82%
+    }
+
+    @@media (min-width: 1601px) {
+        .easyui-layout {
+            min-height: calc(100vh - 109px);
+        }
+
+        .easyui-datagrid {
+            min-height: 89%
+        }
+    }
+</style>
+<body>
+    <div class="header-nav navbar navbar-default navbar-expand-lg navbar-light bg-light">
+        <div class="container-fluid">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="/"><img src="@defaultUrl/Content/logo.png" style="width:140px; margin-top:-8px;" /></a>
+                <button class="navbar-toggler navbar-toggle" type="button" data-toggle="collapse" data-target="#navbarbtn" aria-controls="navbarbtn" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+            </div>
+            <div class="collapse navbar-collapse main-header" id="navbarbtn">
+                <ul class="nav navbar-nav mr-auto float-right text-right pr-3 navbar-menu">
+                    <li class="dropdown">
+                        <a class="dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">基本資料管理<span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                            <li class="dropdown-submenu">
+                                <a class="dropdown-item" tabindex="-1" data-toggle="dropdown">主檔管理</a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="/MasterManage/CustomerManage">客戶主檔</a></li>
+                                    <li><a class="dropdown-item" href="/MasterManage/VendorManage">廠商主檔</a></li>
+                                    <li><a class="dropdown-item" href="/MasterManage/WorkCenterManage">工作中心</a></li>
+                                    <li><a class="dropdown-item" href="/MasterManage/MaterialMasterManage">物料主檔</a></li>
+                                    <li><a class="dropdown-item" href="/MasterManage/MesProcessSection">製造工段主檔</a></li>
+                                    <li><a class="dropdown-item" href="/MasterManage/StepOperDept">站點認證部門維護</a></li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="dropdown">
+                        <a class="dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">工單管理<span class="caret"></span></a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/WorkOrderManage/WoSchedule">工單派工</a></li>
+                            <li><a class="dropdown-item" href="/Dispatch/Dispatch">人員派工</a></li>
+                            <li><a class="dropdown-item" href="/WorkOrderManage/WoLotManage">工單序號管理</a></li>
+                            <li><a class="dropdown-item" href="/WorkOrderManage/LotRouteManage">序號站點管理</a></li>
+                            <li><a class="dropdown-item" href="/WorkOrderManage/LotRulesManage">序號規則管理</a></li>
+                            <li><a class="dropdown-item" href="/WorkOrderManage/LotManualManage">序號人工下線</a></li>
+                            <li><a class="dropdown-item" href="/WorkOrder/WoManage">工單異常處理</a></li>
+                        </ul>
+                    </li>
+                </ul>
+                <ul class="nav navbar-nav navbar-right float-right text-right pr-3 navbar-right-icon">
+                    <li class="dropdown">
+                        <a class="dropdown-toggle" data-toggle="dropdown" href="#" aria-haspopup="true" aria-expanded="false">
+                            <i class="fa fa-cog" aria-hidden="true"></i>
+                            <span class="caret"></span>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/BaseInfoManage/GroupManage">分組管理</a></li>
+                        </ul>
+                    </li>
+                    <li>
+                        <a href="/Admin/Account/Login">
+                            <i class="fa fa-user" aria-hidden="true"></i>
+                            <span class="hidden-easy xs">
+                                @if (User != null && User.Identity.IsAuthenticated)
+                                {@((User as CustomPrincipal).UserName);
+                                }
+                            </span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/Admin/Account/Logout">
+                            <i class="fa fa-sign-out" aria-hidden="true"></i>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="flex-1">
+        <div class="container-fluid d-flex" style="width: 98%; margin: 10px 10px">
+            <div class="easyui-layout" id="easyui-layout">
+                <div data-options="region:'west',split:true" title="功能選單" style="width:200px;">
+                    <ul class="easyui-tree" data-options="animate:true,onClick:menuClick">
+                        @*<li>
+                            <span>🏭 機台管理</span>
+                            <ul>
+                                <li data-options="attributes:{url:'/MachineList/Index'}">機台清單</li>
+                            </ul>
+                        </li>*@
+                        <li>
+                            <span>📋 參數管理</span>
+                            <ul>
+                                <li data-options="attributes:{url:'/Param/Index'}">參數管理</li>
+                                <li data-options="attributes:{url:'/MachineParam/Index'}">機台參數管理</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <span>🧪 配方建立/修改</span>
+                            <ul>
+                                <li data-options="attributes:{url:'/RecipeManage/Edit'}">配方編輯</li>
+                                <li data-options="attributes:{url:'/RecipeManage/List'}">配方清單</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <span>👤 權限控管</span>
+                            <ul>
+                                <li data-options="attributes:{url:'/Permission/RoleList'}">權限管理</li>
+                                <li data-options="attributes:{url:'/Permission/UserList'}">使用者清單</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 主內容區 -->
+                <div data-options="region:'center'" style="padding:10px;">
+                    @RenderBody()
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="footer">
+        <div id="footer-inner" style="text-align: center; font-size: xx-small">
+            Copyright © 2024 Gudeng Industrial Corp. All Rights Reserved.
+        </div>
+    </div>
+    <script src="@defaultUrl/Scripts/base/jquery/jquery-3.5.1.min.js"></script>
+    <script src="@defaultUrl/Scripts/base/bootstrap/bootstrap4.js"></script>
+    <script src="~/Scripts/base/easyui/jquery.easyui.min.js"></script>
+    <script>
+        function menuClick(node) {
+            const url = node.attributes?.url || node.url || node['data-url'];
+            if (url) {
+                window.location.href = url;
+            }
+        }
+    </script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>
+
+
+
+
+
+
+

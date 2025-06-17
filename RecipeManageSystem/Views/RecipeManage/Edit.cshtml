@@ -1,0 +1,267 @@
+﻿@{
+    ViewBag.Title = "配方建立／修改";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+@section css{
+    <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/bootstrap/easyui.css")" />
+    <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/icon.css")" />
+}
+
+<h2>配方建立／修改</h2>
+
+<div style="margin-bottom:10px;">
+
+    <label style="width:60px;display:inline-block;margin-left:20px">機台：</label>
+    <input id="recipeMachine" class="easyui-combobox" style="width:180px" />
+
+    <label style="width:60px;display:inline-block">料號：</label>
+    <input id="prodNo" class="easyui-combobox" style="width:180px" />
+
+    <label style="width:60px;display:inline-block;margin-left:20px">模具：</label>
+    <input id="moldNo" class="easyui-combobox" style="width:180px" />   
+    
+    <label style="width:60px;display:inline-block;margin-left:20px">原料：</label>
+    <input id="materialNo" class="easyui-combobox" style="width:180px" />
+
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-play" onclick="startBuild()" style="margin-left:10px">開始建立</a>
+</div>
+
+<table id="paramGrid" class="easyui-datagrid" style="width:100%;height:350px"
+       data-options="singleSelect:true,fitColumns:true,nowrap:false,autoRowHeight:true">
+    <thead>
+        <tr>
+            <th data-options="field:'ParamName',title:'參數',width:250">參數</th>
+            <th data-options="field:'MaxValue',title:'數值',width:100,editor:{type:'textbox'}">上限值</th>
+            <th data-options="field:'StdValue',title:'數值',width:100,editor:{type:'textbox'}">標準值</th>
+            <th data-options="field:'MinValue',title:'數值',width:100,editor:{type:'textbox'}">下限值</th>
+            <th data-options="field:'BiasMethod',title:'數值',width:100,editor:{type:'textbox'}">偏差設定方式</th>
+            <th data-options="field:'BiasValue',title:'數值',width:100,editor:{type:'textbox'}">偏差值</th>
+        </tr>
+    </thead>
+</table>
+
+<div style="margin-top:10px;text-align:right">
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-save" onclick="saveRecipe('save')">修改</a>    
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-save" onclick="saveRecipe('newVersion')">令存新版本</a>
+</div>
+
+@section Scripts {
+    <script src="~/Scripts/base/easyui/jquery.easyui.min.js"></script>
+    <script>
+        let lastEditIndex = null;
+        let currentRecipeId = 0;
+        const prodOptions = [
+            { value: '3101-0002240', text: '3101-000224' },
+          
+        ];
+        const moldOptions = [
+            { value: 'MD09268', text: 'MD09268' },
+        ];
+        const biasMethod = [
+            { value: 'customize', text: '自定義' },
+            { value: 'plusminus', text: '正負加減值' },
+            { value: 'percent', text: '正負加減%數' }
+        ]
+
+        $(function () {
+            // 1. 初始化料號 Combobox (假資料)
+            $('#prodNo').combobox({
+                data: prodOptions,
+                valueField: 'value',
+                textField: 'text',
+                panelHeight: 'auto'
+            });
+
+            // 2. 初始化模具 Combobox (假資料)
+            $('#moldNo').combobox({
+                data: moldOptions,
+                valueField: 'value',
+                textField: 'text',
+                panelHeight: 'auto'
+            });
+            // 1. 拿機台清單
+            $.get('@Url.Action("GetMachineList","MachineManage")', res => {
+              if (!res.success) {
+                return $.messager.alert('錯誤', '無法取得機台清單');
+              }
+
+              // 2. 初始化 Combobox
+              $('#recipeMachine').combobox({
+                data: res.data,             // 確定是 [{ DeviceId, DeviceName }, ...]
+                valueField: 'DeviceID',     // 值用 DeviceId
+                textField: 'DeviceName',    // 顯示用 DeviceName
+                panelHeight: 'auto',
+                filter: function (q, row) { return row.DeviceName.indexOf(q) >= 0; },
+                //onSelect: rec => loadParamGrid(rec.DeviceID)
+              });
+            });
+
+
+            let editing = { index: null, field: null };
+
+            $('#paramGrid').datagrid({
+                columns: [[
+                    { field: 'ParamName', title: '參數', width: 250 },
+                    { field: 'StdValue', title: '標準值', width: 100, editor: { type: 'textbox' } },
+                    { field: 'MaxValue', title: '上限值', width: 100, editor: { type: 'textbox' } },
+                    { field: 'MinValue', title: '下限值', width: 100, editor: { type: 'textbox' } },
+                    {
+                        field: 'BiasMethod', title: '偏差方式', width: 120,
+                        formatter: function (value) {
+                            const m = biasMethod.find(x => x.value === value);
+                            return m ? m.text : value;
+                        },
+                        editor: {
+                            type: 'combobox',
+                            options: {
+                                data: biasMethod,
+                                valueField: 'value',
+                                textField: 'text',
+                                editable: false,
+                                panelHeight: 'auto'
+                            }
+                        }
+                    },
+                    {
+                        field: 'BiasValue', title: '偏差值', width: 100,
+                        editor: { type: 'numberbox', options: { precision: 2 } }
+                    }
+                ]],
+                onClickCell(i, field) {
+                    const dg = $(this);
+                    if (editing.index === i && editing.field === field) {
+                        dg.datagrid('endEdit', i);
+                    } else {
+                        if (editing.index !== null) dg.datagrid('endEdit', editing.index);
+                        dg.datagrid('beginEdit', i);
+                        editing = { index: i, field };
+                    }
+                },
+                onEndEdit(index, row, changes) {
+                    // 只有偏差值或方式變更，才算一次新的上下限
+                    console.log("row",row, "chang", changes)
+                    if ('BiasValue' in changes || 'BiasMethod' in changes) {
+                        const orig = parseFloat(row.StdValue) || 0;
+                        const bias = parseFloat(row.BiasValue) || 0;
+                        let max = orig, min = orig;
+                        if (row.BiasMethod === 'plusminus') {
+                            max = orig + bias; min = orig - bias;
+                        } else if (row.BiasMethod === 'percent') {
+                            max = orig * (1 + bias / 100);
+                            min = orig * (1 - bias / 100);
+                        }
+
+                        if (row.BiasMethod === 'plusminus' || row.BiasMethod === 'percent') {
+                            $('#paramGrid').datagrid('updateRow', {
+                                index,
+                                row: {
+                                    MaxValue: max.toFixed(2),
+                                    MinValue: min.toFixed(2)
+                                }
+                            });
+                            // 同步更新 row 物件
+                            row.MaxValue = max.toFixed(2);
+                            row.MinValue = min.toFixed(2);
+                        }
+                    }
+                    // 清掉正在編輯的記錄
+                    editing = { index: null, field: null };
+                }
+            });
+
+        });
+
+      // 根據機台載入參數定義
+        function loadParamGrid(deviceId, prodNo, materialNo, moldNo) {
+            console.log("loadPramGrid", deviceId, { prodNo }, { materialNo }, {moldNo})
+            lastEditIndex = null;
+            $.get('@Url.Action("GetParamDetailToEdit", "RecipeManage")', { deviceId, prodNo, materialNo, moldNo }, res => {
+                if (!res.success) return $.messager.alert('錯誤', res.message || '無法讀取參數');
+                console.log("res",res)
+                const rows = res.data.Params.map(d => ({
+                    ParamId: d.ParamId,
+                    ParamName: d.Unit ? `${d.ParamName} (${d.Unit})` : d.ParamName,
+                    StdValue: d.StdValue != null ? d.StdValue : '',
+                    origStdValue: d.StdValue != null ? d.StdValue : '',  // 保留原始值
+                    MaxValue: d.MaxValue != null ? d.MaxValue : '',
+                    MinValue: d.MinValue != null ? d.MinValue : '',
+                    BiasMethod: d.BiasMethod != null ? d.BiasMethod : 'custom',  // 初始預設自定義
+                    BiasValue: d.BiasValue != null ? d.BiasValue : ''     // 空白
+                }));
+                $('#paramGrid').datagrid('loadData', rows);
+                currentRecipeId = res.data.Params?.[0].RecipeId ?? 0
+            });
+          }
+
+        function startBuild() {
+            const deviceId = $('#recipeMachine').combobox('getValue');
+            if (!deviceId) {
+                return $.messager.alert('提示', '機台為必選，請先選擇機台');
+            }
+            console.log({ deviceId })
+            const prodNo = $('#prodNo').combobox('getValue');
+            const materialNo = $('#materialNo').combobox('getValue');
+            const moldNo = $('#moldNo').combobox('getValue');
+            // 呼叫既有的載入參數
+            loadParamGrid(deviceId, prodNo, materialNo, moldNo);
+        }
+
+          // 儲存按鈕
+        function saveRecipe(mode) {
+       
+        // 1. 結束正在編輯的格子
+        if (lastEditIndex != null) {
+            $('#paramGrid').datagrid('endEdit', lastEditIndex);
+            lastEditIndex = null;
+        }
+
+        // 收參數值
+            const paramRows = $('#paramGrid').datagrid('getRows').map(r => ({
+            ParamId: r.ParamId,
+            ParamName: r.ParamName,
+            StdValue: r.StdValue,
+            MaxValue: r.MaxValue,
+            MinValue: r.MinValue,
+            BiasMethod: r.BiasMethod,
+            BiasValue: r.BiasValue
+        }));
+
+        // 3. 收頂端欄位（注意：名稱要跟後端 DTO 一樣）
+            const dto = {
+            Mode: mode,
+            RecipeId : currentRecipeId,
+            ProdNo: $('#prodNo').combobox('getValue'),      // 料號
+            MaterialNo: $('#materialNo').combobox('getValue'),  // 原料（選填）
+            MoldNo: $('#moldNo').combobox('getValue'),      // 模具（選填）
+            DeviceId: $('#recipeMachine').combobox('getValue'),// 機台（必填）
+            RecipeDetails: paramRows
+        };
+        console.log(dto)
+        // 4. 前端簡易驗證
+            if (!dto.ProdNo || !dto.DeviceId) {
+            return $.messager.alert('提示', '請先選擇「料號」與「機台」');
+        }
+
+
+        // 傳到後端
+        $.ajax({
+            url: '@Url.Action("SaveRecipe","RecipeManage")',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(dto),
+            success: res => {
+                if (res.success) {
+                    $.messager.alert('成功','儲存完成');
+                } else {
+                    $.messager.alert('錯誤', res.message || '儲存失敗');
+                }
+                },
+                error: () => $.messager.alert('錯誤','儲存時發生錯誤')
+            });
+        }
+
+
+    </script>
+
+}

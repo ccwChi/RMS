@@ -1,0 +1,129 @@
+﻿@{
+    ViewBag.Title = "配方清單";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+@section css{
+    <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/bootstrap/easyui.css")" />
+    <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/icon.css")" />
+}
+
+<h2>配方清單</h2>
+<div id="toolbar" style="padding:5px;">
+    料號：<input id="searchProdNo" class="easyui-textbox" style="width:120px" data-options="prompt:'搜尋料號'" />
+    機台：<input id="searchDevice" class="easyui-textbox" style="width:120px" data-options="prompt:'搜尋機台'" />
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-search" onclick="searchRecipes()">搜尋</a>
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-reload" onclick="clearSearch()">清除</a>
+</div>
+
+<table id="recipeGrid" class="easyui-datagrid" style="width:100%;height:500px"
+       data-options="
+         url: '@Url.Action("GetRecipes","RecipeManage")',
+         method: 'get',
+         toolbar: '#toolbar',
+         pagination: true,
+         pageSize: 50,
+         pageList: [50,100,200],
+         rownumbers: true,
+         singleSelect: true,
+         fitColumns: true,
+         view: detailview,
+         detailFormatter: detailFormatter,
+         onExpandRow: onExpandRow
+       ">
+    <thead>
+        <tr>
+            <th data-options="field:'RecipeId',hidden:true">ID</th>
+            <th data-options="field:'DeviceName',title:'機台',width:120">機台</th>
+            <th data-options="field:'ProdNo',title:'料號',width:80">料號</th>
+            <th data-options="field:'ProdName',title:'品名',width:80">品名</th>
+            <th data-options="field:'MoldNo',title:'模具',width:80">模具</th>
+            <th data-options="field:'MaterialNo',title:'原料',width:80">原料</th>
+            <th data-options="field:'CreateBy',title:'建立者',width:80">建立者</th>
+            <th data-options="field:'CreateDate',title:'建立時間',width:80, formatter:formatDate">建立時間</th>
+            <th data-options="field:'Version',title:'版次',width:30,align:'center'">版次</th>
+            <th data-options="field:'IsActive',title:'啟用',width:30,align:'center',formatter:formatActive">啟用</th>
+        </tr>
+    </thead>
+</table>
+
+@section Scripts{
+    <!-- jQuery + EasyUI -->
+    <script src="~/Scripts/base/easyui/jquery.easyui.min.js"></script>
+    <!-- 引入 detailview plugin -->
+    <script src="~/Scripts/base/easyui/datagrid-detailview.js"></script>
+    <script>
+    // 綠色勾勾格式化
+    function formatActive(val) {
+      return val ? '<i class="fa fa-check" style="color:green"></i>' : '';
+    }
+
+    // 在每一列下方先放一個空 DIV
+    function detailFormatter(index,row){
+      return '<div class="ddv" style="padding:10px 20px;"></div>';
+    }
+
+    // 展開列時觸發：建立子 grid 並 loadData
+    function onExpandRow(index,row){
+      var parentGrid = $('#recipeGrid');
+      var ddv = parentGrid.datagrid('getRowDetail',index)
+            .find('div.ddv');
+
+      ddv.empty();
+      // 建立子 table
+      var tbl = $('<table/>').appendTo(ddv);
+      tbl.datagrid({
+        fitColumns: true,
+        singleSelect: true,
+        height: 'auto',
+        columns:[[
+          { field:'Index',  title:'#', width:30 },
+          { field:'ParamName',  title:'參數項目', width:200 },
+          { field:'MaxValue', title:'上限值', width:100 },
+          { field:'StdValue', title:'標準值', width:100 },
+          { field:'MinValue', title:'下限值', width:100 }
+        ]]
+      });
+      // 請求後端 JSON
+      $.getJSON('@Url.Action("GetRecipeDetails","RecipeManage")', { recipeId: row.RecipeId }, function(res){
+        if (res.success) {
+          tbl.datagrid('loadData', res.rows);
+        }
+        // 調整主表 detail row 高度
+        parentGrid.datagrid('fixDetailRowHeight', index);
+      });
+        }
+
+        function formatDate(value, row, index) {
+            if (!value) return '';
+
+            // 抓出 timestamp 數字部分
+            var matches = /\/Date\((\d+)\)\//.exec(value);
+            if (!matches) return '';
+
+            var timestamp = parseInt(matches[1], 10);
+            var date = new Date(timestamp);
+
+            var yyyy = date.getFullYear();
+            var mm = ('0' + (date.getMonth() + 1)).slice(-2);
+            var dd = ('0' + date.getDate()).slice(-2);
+
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+    </script>
+    <script>
+        function searchRecipes() {
+            const prodNo = $('#searchProdNo').textbox('getValue');
+            const deviceName = $('#searchDevice').textbox('getValue');
+            $('#recipeGrid').datagrid('load', {
+                prodNo: prodNo,
+                deviceName: deviceName
+            });
+        }
+        function clearSearch() {
+            $('#searchProdNo, #searchDevice').textbox('clear');
+            $('#recipeGrid').datagrid('load', {});
+        }
+
+    </script>
+}

@@ -6,9 +6,24 @@
 @section css{
     <link rel="stylesheet" href="@Href("~/Scripts/base/easyui/themes/bootstrap/easyui.css")" />
     <link rel="stylesheet" href="@Href("~/Scripts/base/easyui/themes/icon.css")" />
+    <style>
+        .param-cell {
+            display: flex;
+            padding-top: 10px;
+            align-items: flex-start; /* 文字在上 */
+            overflow-x: auto;
+            height: 50px;
+        }
+
+        .easyui-datagrid .datagrid-header .datagrid-cell {
+
+            height: 50px;
+            line-height: 50px;
+        }
+    </style>
 }
 
-<h2>機台參數對照維護</h2>
+<h2>機台參數對照維護(雙擊項目開啟編輯)</h2>
 
 <table id="mpGrid" class="easyui-datagrid" style="width:100%;">
     <thead>
@@ -20,31 +35,53 @@
     </thead>
 </table>
 
-<div id="toolbar" style="padding:5px;">
-    <a href="javascript:void(0)" class="easyui-linkbutton" data-options="iconCls:'icon-add'" onclick="openMpDialog(0)">新增</a>
+<div id="toolbar" style="padding:5px 0; display:flex; align-items:center">
+    <div href="javascript:void(0)" class="custom-easyui-button" onclick="openMpDialog(0)">新增</div>
 </div>
 
-
 <!-- 新增/編輯 Dialog -->
-<div id="mpDlg" class="easyui-dialog" closed="true" style="width:400px;padding:10px" modal="true" buttons="#mpDlgBtns">
-    <form id="mpForm" method="post" style="padding:10px">
+<div id="mpDlg" class="easyui-dialog" closed="true" style="width:80%; height:80%; overflow:auto" modal="true" buttons="#mpDlgBtns">
+    <form id="mpForm" method="post">
         <input type="hidden" name="MappingId" />
 
-        <div style="margin-bottom:8px">
+        <div style="margin:8px">
             <label style="display:inline-block;width:80px">機台：</label>
             <input name="Device"
                    id="Device"
                    class="easyui-combobox"
                    style="width:300px" />
+            <label style="display:inline-block;width:80px">料號：</label>
+            <input name="ProdNo"
+                   id="ProdNo"
+                   class="easyui-textbox"
+                   style="width:300px" />
         </div>
 
-        <div id="paramList" style="max-height:200px; overflow-y:auto; border:1px solid #ddd; padding:5px;"></div>
+        <div id="paramList"
+             style="overflow-y: auto; border: 1px solid #ddd; padding: 15px; display: flex; flex-wrap: wrap; justify-content: space-between">
+        </div>
 
     </form>
+    <div id="saveOverlay" style="
+            display:none;
+            position:absolute;
+            top:0;
+            left:0;
+            width:100%;
+            height:100%;
+            background-color:rgba(255,255,255,0.7);
+            z-index:9999;
+            justify-content:center;
+            align-items:center;
+            font-size:18px;
+            color:#333;
+        ">
+        <div><i class="fa fa-spinner fa-spin"></i> 儲存中，請稍候...</div>
+    </div>
 </div>
-<div id="mpDlgBtns" style="text-align:center;padding:5px">
-    <a href="javascript:void(0)" class="easyui-linkbutton" onclick="saveMp()">儲存</a>
-    <a href="javascript:void(0)" class="easyui-linkbutton" onclick="$('#mpDlg').dialog('close')">取消</a>
+<div id="mpDlgBtns" style="text-align:center; display:flex; justify-content:end;">
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="saveMp()">儲存</a>
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="$('#mpDlg').dialog('close')">取消</a>
 </div>
 
 @section Scripts {
@@ -62,7 +99,8 @@
                 async: false,
                 success: function (res) {
                     if (res.success) {
-                        machineList = res.data;
+                        machineList = res.data; 
+                        console.log(machineList)
                     } else {
                         $.messager.alert('錯誤', '無法載入機台清單');
                     }
@@ -107,96 +145,73 @@
             });
 
             $('#mpGrid').datagrid({
-                url: '@Url.Action("GetMachineParamList", "MachineParam")',
+                data: machineList,
                 method: 'get',
                 toolbar: '#toolbar',
                 fitColumns: true,
                 singleSelect: true,
-
-                // ← 這裡把多筆資料轉成每台一列
-                loadFilter: function (res) {
-                    console.log("res",res)
-                    if (!res.success) {
-                        return { total: 0, rows: [] };
-                    }
-                    const map = {};
-                    res.data.forEach(r => {
-                        if (!map[r.DeviceId]) {
-                            map[r.DeviceId] = {
-                                DeviceId: r.DeviceId,           // <- 帶上 DeviceId
-                                DeviceName: r.DeviceName,
-                                params: []
-                            };
-                        }
-                        map[r.DeviceId].params.push(r.ParamName);
-                    });
-                    // 2. 轉成 easyui 要的 rows
-                    const rows = Object.values(map).map((item, idx) => ({
-                        Index: idx + 1,
-                        DeviceId: item.DeviceId,          // <- 帶上 DeviceId
-                        DeviceName: item.DeviceName,
-                        Parameters: item.params.join('、')
-                    }));
-                    return {
-                        total: rows.length,
-                        rows: rows
-                    };
-                },
                 columns: [[
-                    { field: 'Index', title: '#', width: 30, align: 'center' },
-                    { field: 'DeviceName', title: '機台', width: 100, align: 'center' },
-                    {
-                        field: 'Parameters', title: '參數', width: 600, align: 'left',
-                        formatter(value) { return `<div style="white-space:nowrap;overflow-x:auto">${value}</div>`; }
-                    }
+                    { field: 'DeviceID', title: '機台代號', width: 100 },
+                    { field: 'DeviceName', title: '機台名稱', width: 200 }
                 ]],
                 onDblClickRow: function (_, row) {
-                    openMpDialog(row.DeviceId);             // <- 傳 DeviceId 而不是 MappingId
+                    openMpDialog(row.DeviceID);   // 只帶 DeviceID
                 }
             });
 
         });
 
         function openMpDialog(deviceId) {
-            
-            $('#mpForm').form('clear');
-            $('#Device')
-                .combobox('loadData', machineList)
-                .combobox(deviceId ? 'disable' : 'enable');
 
-            if (!deviceId) {
-              // 新增
-              renderParamCheckboxes([]);    // 全部不選
-              $('#mpDlg')
-                .dialog('setTitle', '新增機台參數對照表')
-                  .dialog('open')
-                  .dialog('center')  ;
-            } else {
-                console.log("deviceId", deviceId)
-                $.ajax({
-                    url: '@Url.Action("GetMappingByDevice", "MachineParam")',
-                    method: 'GET',
-                    dataType: 'json',
-                    data: { deviceId: deviceId },
-                    success: function (res) {
-                        if (!res.success) {
-                            $.messager.alert('錯誤', res.message || '讀取參數定義失敗');
-                            return;
-                        }
-                        var data = res.data;   
-                        console.log(data)
-                        $('#Device').combobox('setValue', data.DeviceId);
-                        console.log("paramList",paramList);
-                        renderParamCheckboxes(data.ParamIds);
-                        $('#mpForm').find('[name=MappingId]').val('');  // 可不存 MappingId，更新也是用 DeviceId
-                        $('#mpDlg').dialog('setTitle', '編輯映射').dialog('open').dialog('center');;
-                    },
-                    error: function() {
-                    $.messager.alert('錯誤', '讀取參數定義時發生錯誤');
-                    }
-                });
-            }
-          }
+    $('#mpForm').form('clear');
+    $('#Device')
+        .combobox('loadData', machineList)
+        .combobox(deviceId ? 'disable' : 'enable');
+
+    // 1) 先確保 paramList 已經有資料，若沒有就 AJAX 取一次
+    var p1 = $.Deferred();
+    if (paramList.length) {
+        p1.resolve();   // 已有就直接結束
+    } else {
+        $.getJSON('@Url.Action("GetParameterList","Param")', function (res) {
+            if (!res.success) { $.messager.alert('錯誤', '無法載入參數清單'); p1.reject(); return; }
+            paramList = res.data;
+            p1.resolve();
+        }).fail(function () { $.messager.alert('錯誤', '無法載入參數清單'); p1.reject(); });
+    }
+
+    // 2) 如果是編輯，另開 AJAX 抓該機台已選參數；若是新增，直接用空陣列
+    var p2 = $.Deferred();
+    if (!deviceId) {
+        p2.resolve([]);            // 新增 → 沒有已選值
+    } else {
+        $.getJSON('@Url.Action("GetMappingByDevice","MachineParam")', { deviceId }, function (res) {
+            if (!res.success) { $.messager.alert('錯誤', '讀取資料失敗'); p2.reject(); return; }
+            p2.resolve(res.data.ParamIds || []);
+            $('#Device').combobox('setValue', res.data.DeviceId);
+        }).fail(function () { $.messager.alert('錯誤', '讀取資料失敗'); p2.reject(); });
+    }
+
+    // 3) 兩個 AJAX 都完成後再 render & 開 Dialog
+    $.when(p1, p2).done(function (_, selectedIds) {   // selectedIds 是 p2 的結果
+        renderParamCheckboxes(selectedIds);
+        $('#mpDlg')
+            .dialog({ title: deviceId ? '編輯機台參數' : '新增機台參數', closed: false, modal: true })
+            .dialog('center');
+    });
+        }
+
+        function renderParamCheckboxes(selectedIds = []) {
+            var $c = $('#paramList').empty();
+            paramList.forEach(p => {
+                const chk = selectedIds.includes(p.ParamId) ? 'checked' : '';
+                $c.append(
+                    `<label style="display:block;margin:2px 0;">
+                <input type="checkbox" name="ParamIds" value="${p.ParamId}" ${chk}> ${p.ParamName}
+              </label>`
+                );
+            });
+        }
 
         function saveMp() {
             var deviceId = $('#Device').combobox('getValue');
@@ -205,6 +220,8 @@
             }).get();
             console.log({ deviceId })
             console.log({ params })
+            $('#saveOverlay').css('display', 'flex');
+
               // 4. 呼叫 API
               $.ajax({
                 url: '@Url.Action("SaveMapping", "MachineParam")',
@@ -214,7 +231,9 @@
                       DeviceId: deviceId,
                       Params: params
                   }),
-                success: function (res) {
+                  success: function (res) {
+                      $('#saveOverlay').hide();
+
                   if (res.success) {
                     $('#mpDlg').dialog('close');
                     $('#mpGrid').datagrid('reload');
@@ -222,7 +241,8 @@
                     $.messager.alert('錯誤', res.message);
                   }
                 },
-                error: function () {
+                  error: function () {
+                      $('#saveOverlay').hide();
                   $.messager.alert('錯誤', '儲存時發生問題');
                 }
               });
@@ -232,15 +252,11 @@
             var container = $('#paramList');
             container.empty();  // 先清空
 
-            // paramList 一定要是在頁面最上方同步或 onLoad 成功後就 fill 好
             paramList.forEach(p => {
-                // p.Id 與 p.ParamName 一定都有
                 const checked = selectedIds.includes(p.ParamId) ? 'checked' : '';
-                container.append(`
-                  <label style="display:block; margin:2px 0;">
-                    <input type="checkbox" name="ParamIds" value="${p.ParamId}" ${checked}> ${p.ParamName}
-                  </label>
-                `);
+                container.append(`<label style="width:250px; margin:3px 0; display:inline-block;">
+                                    <input type="checkbox" name="ParamIds" value="${p.ParamId}" ${checked}> ${p.ParamName}
+                                  </label>`);
             });
         }
 

@@ -9,6 +9,7 @@ using RecipeManageSystem.Generic;
 using System.Configuration;
 using System.Data.SqlClient;
 using System.Security.Principal;
+using Dapper;
 
 namespace RecipeManageSystem
 {
@@ -22,9 +23,9 @@ namespace RecipeManageSystem
 
         protected void Application_AuthenticateRequest()
         {
-            string env = ConfigurationManager.AppSettings["EnvFlag"];
+            string defaultLogin = ConfigurationManager.AppSettings["DefaultLogin"];
             
-            if (env != "1") // 只在測試環境啟用
+            if (defaultLogin == "1") // 只在測試環境啟用
             {
                 // 如果尚未驗證，就手動建立登入票證
                 if (HttpContext.Current.User == null)
@@ -63,33 +64,42 @@ namespace RecipeManageSystem
             if (User?.Identity?.IsAuthenticated == true)
             {
                 var systemPrincipal = User;
-                var newUser = new CustomPrincipal(systemPrincipal);
+                var customUser = new CustomPrincipal(systemPrincipal);
 
                 var flag = ConfigurationManager.AppSettings["EnvFlag"];
-                var connName = (flag == "1") ? "MESConnection" : "MES_DEVConnection";
-                var connStr = ConfigurationManager.ConnectionStrings[connName].ConnectionString;
+                var mesConnKey = flag == "1" ? "MESConnection" : "MES_DEVConnection";
+                var mesConnStr = ConfigurationManager.ConnectionStrings[mesConnKey].ConnectionString;
 
-                using (var conn = new SqlConnection(connStr))
+                using (var mesConn = new SqlConnection(mesConnStr))
                 {
-                    conn.Open();
-                    var cmd = new SqlCommand(@"
-                                    SELECT TOP 1 UserNo, UserName, DepartmentNo, TitleName , DepartmentName
-                                    FROM MES_USERS 
-                                    WHERE (UserNo = @name OR LdapAccount = @name) AND ExpirationDate IS NULL", conn);
-                    cmd.Parameters.AddWithValue("@name", User.Identity.Name);
+                    const string sql = @"
+                    SELECT TOP 1
+                        UserNo,
+                        UserName,
+                        DepartmentNo AS DeptNo,
+                        DepartmentName AS DeptName,
+                        TitleName      AS Title
+                    FROM MES_USERS
+                    WHERE (UserNo = @name OR LdapAccount = @name)
+                      AND ExpirationDate IS NULL";
 
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            newUser.UserNo = reader["UserNo"].ToString();
-                            newUser.UserName = reader["UserName"].ToString();
-                            newUser.DeptNo = reader["DepartmentNo"].ToString();
-                            newUser.Title = reader["TitleName"].ToString();
-                            newUser.DeptName = reader["DepartmentName"].ToString(); 
-                            HttpContext.Current.User = newUser;
-                        }
-                    }
+                    var mesInfo = mesConn.QuerySingleOrDefault<(string UserNo, string UserName, string DeptNo, string DeptName, string Title)>(
+                        sql, new { name = User.Identity.Name });
+
+                    if (mesInfo == default)
+                        return;
+
+                    customUser.UserNo = mesInfo.UserNo;
+                    customUser.UserName = mesInfo.UserName;
+                    customUser.DeptNo = mesInfo.DeptNo;
+                    customUser.DeptName = mesInfo.DeptName;
+                    customUser.Title = mesInfo.Title;
+
+                    // 3. 再連到 RMS DB，初始化 RoleId + PermissionIds
+                    customUser.InitializePermissions();
+
+                    // 4. 把 HttpContext.Current.User 換成我們的 customUser
+                    HttpContext.Current.User = customUser;
                 }
             }
         }

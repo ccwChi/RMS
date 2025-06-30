@@ -27,10 +27,11 @@
 
 
 <div id="toolbar" style="margin:10px 0;">
-    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="openParamDialog(0)">
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="openParamDialog(0)">
         新增
     </a>
 </div>
+
 
 <!-- 新增／編輯 Dialog -->
 <div id="paramDlg" class="easyui-dialog" style="width:400px" closed="true" buttons="#paramDlg-buttons" modal="true">
@@ -44,13 +45,18 @@
 
         <div style="margin-bottom:8px">
             <label style="display:inline-block;width:80px">單位：</label>
-            <input name="Unit" id="Unit" class="easyui-combobox" style="width:200px" />
+            @*<input name="Unit" id="Unit" class="easyui-combobox" style="width:200px" />*@
+            <select name="Unit" id="Unit" class="easyui-combobox" style="width:200px"
+                    data-options="valueField:'Unit', textField:'Unit', panelHeight:'auto'">
+            </select>
         </div>
 
         <div style="margin-bottom:8px">
             <label style="display:inline-block;width:80px">工段：</label>
-            <input name="SectionCode" id="SectionCode" class="easyui-combobox"
-                   style="width:200px" required="true" />
+            @*<input name="SectionCode" id="SectionCode" class="easyui-combobox"  style="width:200px" required="true" />*@
+            <select name="SectionCode" id="SectionCode" class="easyui-combobox" style="width:200px"
+                    data-options="valueField:'sectionCode', textField:'sectionCode', panelHeight:'auto'">
+            </select>
         </div>
 
         <div style="margin-bottom:8px">
@@ -68,9 +74,9 @@
     </form>
 </div>
 
-<div id="paramDlg-buttons">
-    <a href="javascript:void(0)" class="easyui-linkbutton" onclick="saveParamDefinition()">儲存</a>
-    <a href="javascript:void(0)" class="easyui-linkbutton" onclick="$('#paramDlg').dialog('close')">取消</a>
+<div id="paramDlg-buttons" style="display:flex; justify-content:end">
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="saveParamDefinition()">儲存</a>
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="$('#paramDlg').dialog('close')">取消</a>
 </div>
 
 @section Scripts {

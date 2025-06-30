@@ -7,6 +7,7 @@ using System.Web;
 using MeasrueVendor.Repository;
 using RecipeManageSystem.Models;
 using Dapper;
+using System.Configuration;
 
 namespace RecipeManageSystem.Repository
 {
@@ -47,9 +48,9 @@ namespace RecipeManageSystem.Repository
                     // 不論哪種都要插入明細到新的 recipeId
                     const string sqlDetail = @"
                         INSERT INTO RMS.dbo.RecipeDetail
-                          (RecipeId, ParamId, ParamName, StdValue, MaxValue, MinValue, BiasMethod, BiasValue)
+                          (RecipeId, ParamId, ParamName, StdValue, MaxValue, MinValue, BiasMethod, BiasValue, AlarmFlag)
                         VALUES
-                          (@RecipeId, @ParamId, @ParamName, @StdValue, @MaxValue, @MinValue, @BiasMethod, @BiasValue)";
+                          (@RecipeId, @ParamId, @ParamName, @StdValue, @MaxValue, @MinValue, @BiasMethod, @BiasValue, @AlarmFlag)";
                     foreach (var d in dto.RecipeDetails)
                     {
                         conn.Execute(sqlDetail, new
@@ -61,7 +62,8 @@ namespace RecipeManageSystem.Repository
                             d.MaxValue,
                             d.MinValue,
                             d.BiasMethod,
-                            d.BiasValue
+                            d.BiasValue,
+                            d.AlarmFlag
                         }, tran);
                     }
 
@@ -76,9 +78,9 @@ namespace RecipeManageSystem.Repository
         {
             string sql = @"
                     INSERT INTO RMS.dbo.RecipeHeader
-                      (ProdNo, DeviceId, MoldNo, MaterialNo, ProdName, Version, IsActive, CreateBy)
+                      (ProdNo, DeviceId, MoldNo, MaterialNo, ProdName, Remark, Version, IsActive, CreateBy)
                     VALUES
-                      (@ProdNo, @DeviceId, @MoldNo, @MaterialNo, @ProdName, @Version, 1, @CreateBy);
+                      (@ProdNo, @DeviceId, @MoldNo, @MaterialNo, @ProdName, @Remark, @Version, 1, @CreateBy);
                     SELECT CAST(SCOPE_IDENTITY() AS int);";
             return conn.ExecuteScalar<int>(sql, new
             {
@@ -87,6 +89,7 @@ namespace RecipeManageSystem.Repository
                 dto.MoldNo,
                 dto.MaterialNo,
                 dto.ProdName,
+                dto.Remark,
                 Version = version,
                 CreateBy = user
             }, tran);
@@ -108,7 +111,8 @@ namespace RecipeManageSystem.Repository
                       MaterialNo  = @MaterialNo,
                       ProdName    = @ProdName,
                       UpdateBy    = @UpdateBy,
-                      UpdateDate  = GETDATE()
+                      UpdateDate  = GETDATE(),
+                      Remark      = @Remark
                     WHERE RecipeId = @RecipeId;",
             new
             {
@@ -118,6 +122,7 @@ namespace RecipeManageSystem.Repository
                 dto.MoldNo,
                 dto.MaterialNo,
                 dto.ProdName,
+                dto.Remark,
                 UpdateBy = user
             }, tran);
         }
@@ -138,34 +143,10 @@ namespace RecipeManageSystem.Repository
             new { RecipeId = recipeId, Op = op, User = user }, tran);
         }
 
-        //public List<RecipeTotalDto> GetRecipes()
-        //{
-        //    using (var conn = new SqlConnection(rmsString))
-        //    {
-        //        const string sql = @"
-        //                SELECT 
-        //                  h.RecipeId,
-        //                  h.ProdNo,
-        //                  h.ProdName,
-        //                  h.MaterialNo,
-        //                  h.DeviceId,
-        //                  m.DeviceName,
-        //                  h.MoldNo,
-        //                  h.Version,
-        //                  h.IsActive,
-        //                  h.CreateBy,
-        //                  h.CreateDate
-        //                FROM RMS.dbo.RecipeHeader h
-        //                LEFT JOIN MES_DEV.dbo.MES_MACHINE m ON h.DeviceId = m.DeviceID and StateFlag = 'Y'
-        //                ORDER BY h.CreateDate DESC";
-        //        return conn.Query<RecipeTotalDto>(sql).ToList();
-        //    }
-        //}
-
 
         public List<RecipeTotalDto> GetRecipes(string prodNo, string deviceName)
         {
-            using (var conn = new SqlConnection(rmsString))
+            using (var conn = new SqlConnection(mesString))
             {
                 var sql = @"
                     SELECT 
@@ -179,13 +160,14 @@ namespace RecipeManageSystem.Repository
                       h.CreateBy,
                       h.CreateDate,
                       h.Version,
-                      h.IsActive
+                      h.IsActive,
+                      h.Remark
                     FROM RMS.dbo.RecipeHeader h
-                    LEFT JOIN MES_DEV.dbo.MES_MACHINE m 
-                      ON h.DeviceId = m.DeviceID
+                    LEFT JOIN dbo.MES_MACHINE m ON h.DeviceId = m.DeviceID and m.StateFlag = 'Y'
                     WHERE (@prodNo IS NULL OR h.ProdNo  LIKE '%'+@prodNo+'%')
                       AND (@deviceName IS NULL OR m.DeviceName LIKE '%'+@deviceName+'%')
-                    ORDER BY h.CreateDate DESC;";
+                      AND m.Plant in ('1101', '1103')
+                    ORDER BY h.CreateDate DESC, h.DeviceId, h.ProdNo, h.MoldNo, h.MaterialNo;";
 
                 return conn.Query<RecipeTotalDto>(
                     sql,
@@ -205,9 +187,10 @@ namespace RecipeManageSystem.Repository
             using (var conn = new SqlConnection(rmsString))
             {
                 const string sql = @"
-                    SELECT ParamName, StdValue, MaxValue, MinValue
+                    SELECT ParamName, StdValue, MaxValue, MinValue, BiasMethod, BiasValue, AlarmFlag
                     FROM RMS.dbo.RecipeDetail
                     WHERE RecipeId = @recipeId
+                    AND AlarmFlag = 'Y'
                     ORDER BY RecipeDetailId";
                 return conn.Query<RecipeDetail>(sql, new { recipeId }).ToList();
             }
@@ -220,7 +203,7 @@ namespace RecipeManageSystem.Repository
             List<RecipeEditDto> result = new List<RecipeEditDto>();
 
             // 如果該參數已經有被設定過，讀取出來做更改。
-            string sql = @"Select rh.RecipeId, rh.ProdNo, rh.ProdName, rh.MaterialNo, rh.DeviceId, rh.MoldNo, rh.Version, rh.IsActive, rb.ParamId, rb.ParamName, rb.StdValue , rb.[MinValue] , rb.[MaxValue], rb.BiasMethod, rb.BiasValue, p.Unit
+            string sql = @"Select rh.RecipeId, rh.ProdNo, rh.ProdName, rh.MaterialNo, rh.DeviceId, rh.MoldNo, rh.Version, rh.IsActive, rh.Remark, rb.ParamId, rb.ParamName, rb.StdValue , rb.[MinValue] , rb.[MaxValue], rb.BiasMethod, rb.BiasValue, p.Unit
                            FROM RMS.dbo.RecipeHeader rh 
                            LEFT JOIN RMS.dbo.RecipeDetail rb on rb.RecipeId = rh.RecipeId 
                            LEFT JOIN RMS.dbo.Parameter p on rb.ParamId = p.paramId
@@ -267,6 +250,114 @@ namespace RecipeManageSystem.Repository
             return result;
         }
 
+
+        public List<RecipeVersionDto> GetRecipeVersions(string deviceId, string prodNo, string materialNo, string moldNo)
+        {
+            using (var conn = new SqlConnection(rmsString))
+            {
+                conn.Open();
+
+                const string sqlVersions = @"
+                    SELECT 
+                      h.RecipeId, h.Version, h.ProdNo, h.MaterialNo, h.MoldNo, h.DeviceId, h.Remark,h.CreateBy, h.CreateDate, h.UpdateBy, h.UpdateDate,
+                      d.ParamId, d.StdValue, d.MaxValue, d.MinValue, d.BiasMethod, d.BiasValue, 
+                      p.ParamName
+                    FROM RMS.dbo.RecipeHeader h
+                    JOIN RMS.dbo.RecipeDetail d 
+                      ON h.RecipeId = d.RecipeId
+                    LEFT JOIN RMS.dbo.Parameter p 
+                      ON d.ParamId = p.ParamId
+                    WHERE h.DeviceId   = @deviceId
+                      AND h.ProdNo     = @prodNo
+                      AND (@materialNo = '' OR h.MaterialNo = @materialNo)
+                      AND (@moldNo     = '' OR h.MoldNo       = @moldNo)
+                    ORDER BY h.Version DESC;
+                    ";
+
+                var lookup = new Dictionary<int, RecipeVersionDto>();
+
+                // 1) 試著先撈出既有版本
+                conn.Query<RecipeHeader, RecipeDetailDto, RecipeVersionDto>(sqlVersions, (hdr, det) =>
+                    {
+                        if (!lookup.TryGetValue(hdr.RecipeId, out var version))
+                        {
+                            version = new RecipeVersionDto
+                            {
+                                RecipeId = hdr.RecipeId,
+                                DeviceId = hdr.DeviceId,
+                                ProdNo = hdr.ProdNo,
+                                MaterialNo = hdr.MaterialNo,
+                                MoldNo = hdr.MoldNo,
+                                Version = hdr.Version,
+                                Remark = hdr.Remark,
+                                UpdateBy = hdr.UpdateBy,
+                                UpdateDate = hdr.UpdateDate,
+                                CreateBy = hdr.CreateBy,
+                                CreateDate = hdr.CreateDate,
+                                Params = new List<RecipeDetailDto>()
+                            };
+                            lookup.Add(hdr.RecipeId, version);
+                        }
+                        version.Params.Add(det);
+                        return version;
+                    },
+                    new
+                    {
+                        deviceId,
+                        prodNo,
+                        materialNo = materialNo ?? string.Empty,
+                        moldNo = moldNo ?? string.Empty
+                    },
+                    splitOn: "ParamId")
+                    .AsQueryable()  // to consume
+                    .ToList();
+
+                // 如果有既有版本就直接回傳
+                if (lookup.Count > 0)
+                {
+                    return lookup.Values.ToList();
+                }
+
+                // 2) 沒有任何版本，表示全新建立 → 取 MachineParameter 列出所有可填參數
+                const string sqlDefs = @"
+                        SELECT 
+                        p.ParamId, p.ParamName, p.Unit, p.SectionCode, p.SequenceNo, p.IsActive
+                        FROM RMS.dbo.MachineParameter mp
+                        JOIN RMS.dbo.Parameter p 
+                          ON mp.ParamId = p.ParamId
+                        WHERE mp.DeviceId = @deviceId;
+                        ";
+
+                var defs = conn.Query<RecipeDetailDto>(
+                    sqlDefs, new { deviceId }).ToList();
+
+                // 組成一個「空版本」讓前端建立
+                var newVersion = new RecipeVersionDto
+                {
+                    RecipeId = 0,
+                    DeviceId = deviceId,
+                    ProdNo = prodNo,
+                    MaterialNo = materialNo,
+                    MoldNo = moldNo,
+                    Version = 0,
+                    Remark = string.Empty,
+                    UpdateBy = null,
+                    UpdateDate = null,
+                    Params = defs.Select(d => new RecipeDetailDto
+                    {
+                        ParamId = d.ParamId,
+                        ParamName = d.ParamName,
+                        StdValue = string.Empty,
+                        MaxValue = string.Empty,
+                        MinValue = string.Empty,
+                        BiasMethod = "customize",
+                        BiasValue = string.Empty
+                    }).ToList()
+                };
+
+                return new List<RecipeVersionDto> { newVersion };
+            }
+        }
 
 
     }

@@ -10,6 +10,7 @@ namespace RecipeManageSystem.Models
         public string UserNo { get; set; }
         public string LdapAccount { get; set; }
         public string UserName { get; set; }
+        public string Email { get; set; }
         public string DepartmentNo { get; set; }
         public string DepartmentName { get; set; }
         public string TitleName { get; set; }

@@ -1,6 +1,55 @@
-﻿@{
-    ViewBag.Title = "尚未登入";
+﻿@using Newtonsoft.Json;
+@{
+    var isDev = HttpContext.Current.IsDebuggingEnabled;
+    var globalUrl = HttpContext.Current.Application["GlobalUrl"]?.ToString() ?? "/";
+    var defaultUrl = isDev ? "" : globalUrl;
+}
+@{
+    ViewBag.Title = "RMS";
+    Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<h2>@ViewBag.Message</h2>
-<p>請確認您是否已透過主系統登入，或返回首頁。</p>
+@section css{
+    <link rel="stylesheet" href="@Href("~/Scripts/base/easyui/themes/color.css")" />
+    <link rel="stylesheet" href="@Href("~/Scripts/base/easyui/themes/icon.css")" />
+    <link rel="stylesheet" href="@Href("~/Scripts/base/easyui/themes/bootstrap/easyui.css")" />
+    <link rel="stylesheet" href="@Href("~/Content/Site.css?v=0.21")" />
+}
+<style>
+    .custom-easy-ui-btn {
+        color: #444;
+        border: 1px solid #bbb;
+        background: linear-gradient(to bottom, #ffffff 0, #e6e6e6 100%);
+        border-radius: 5px;
+        text-decoration: none;
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        margin: 0;
+        padding: 0 10px;
+        cursor: pointer;
+        outline: none;
+        text-align: center;
+        vertical-align: middle;
+        line-height: 1;
+        height: 32px;
+        font-weight: 600;
+    }
+</style>
+<div class="container-fluid d-flex justify-content-center align-items-center" style="width: 98%; margin: 10px 10px">
+    <img src="@Url.Action("GetRMSLogo", "Home")" alt="RMS_LOGO" style="aspect-ratio:auto; width:40%; padding:0.5rem 0 1rem" />
+    <div style="display:flex; flex-direction:column">
+        <h2>@ViewBag.Message</h2>
+        <p>這個頁面你無權觀看，請洽系統負責人</p>
+    </div>
+</div>
+
+
+
+@section Scripts {
+    <script src="~/Scripts/base/easyui/jquery.easyui.min.js"></script>
+    <script>
+    </script>
+    }
+
+

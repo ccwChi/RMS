@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Web;
 using System.Web.Mvc;
+using RecipeManageSystem.Generic;
 using RecipeManageSystem.Repository;
 
 namespace RecipeManageSystem.Controllers
@@ -11,6 +12,7 @@ namespace RecipeManageSystem.Controllers
     {
         private readonly MachineParamRepository _machineParam = new MachineParamRepository();
 
+        [PermissionAuthorize]
         public ActionResult Index()
         {
             return View();

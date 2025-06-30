@@ -91,7 +91,7 @@ namespace RecipeManageSystem.Repository
         {
             using (var conn = new SqlConnection(mesString))
             {
-                return conn.Query<User>("SELECT UserNo, UserName, DepartmentName FROM dbo.MES_USERS WHERE ExpirationDate IS NULL").ToList();
+                return conn.Query<User>("SELECT UserNo, UserName, Email, DepartmentName FROM dbo.MES_USERS WHERE ExpirationDate IS NULL").ToList();
             }
         }
 
@@ -99,7 +99,7 @@ namespace RecipeManageSystem.Repository
         {
             using (var conn = new SqlConnection(rmsString))
             {
-                return conn.Query<User>("SELECT UserNo, UserName, DepartmentName, RoleId, IsActive, CreateDate FROM RMS.dbo.Users").ToList();
+                return conn.Query<User>("SELECT UserNo, UserName, DepartmentName,Email, RoleId, IsActive, CreateDate FROM RMS.dbo.Users").ToList();
             }
         }
 
@@ -149,7 +149,7 @@ namespace RecipeManageSystem.Repository
         {
             using (var conn = new SqlConnection(rmsString))
             {
-                return conn.QueryFirstOrDefault<User>("SELECT UserNo, UserName, DepartmentName, RoleId, IsActive FROM RMS.dbo.Users WHERE UserNo = @userNo", new { userNo });
+                return conn.QueryFirstOrDefault<User>("SELECT UserNo, UserName, DepartmentName,Email, RoleId, IsActive FROM RMS.dbo.Users WHERE UserNo = @userNo", new { userNo });
             }
         }
 
@@ -169,8 +169,8 @@ namespace RecipeManageSystem.Repository
             }
 
             const string sql = @"
-            INSERT INTO RMS.dbo.Users (UserNo, UserName, DepartmentName, RoleId, IsActive, CreateDate, CreateBy)
-                        VALUES (@UserNo, @UserName, @DepartmentName, @RoleId, @IsActive, @CreateDate, @CreateBy);";
+            INSERT INTO RMS.dbo.Users (UserNo, UserName, DepartmentName,Email, RoleId, IsActive, CreateDate, CreateBy)
+                        VALUES (@UserNo, @UserName, @DepartmentName,@Email, @RoleId, @IsActive, @CreateDate, @CreateBy);";
 
             try
             {
@@ -205,6 +205,7 @@ namespace RecipeManageSystem.Repository
                     SET
                         UserName       = @UserName,
                         DepartmentName = @DepartmentName,
+                        Email          = @Email,
                         RoleId         = @RoleId,
                         IsActive       = @IsActive,
                         UpdateDate     = @UpdateDate,

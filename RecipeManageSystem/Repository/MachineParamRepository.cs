@@ -19,6 +19,7 @@ namespace RecipeManageSystem.Repository
                 string sql = @"SELECT DeviceID, DeviceName, MpsSectionNo, StateFlag
                                FROM MES_MACHINE
                                WHERE StateFlag = 'Y'
+                               AND MpsSectionNo = 'I'
                                ORDER BY DeviceID";
                 return conn.Query<Machine>(sql).ToList();
             }
@@ -102,7 +103,27 @@ namespace RecipeManageSystem.Repository
                 ).ToList();
             }
         }
-        
-        
+
+        public List<MachineParameterView> GetMappingList()
+        {
+            using (var conn = new SqlConnection(rmsString))
+            {
+                string sql = @"
+                    SELECT 
+                        mp.MappingId,
+                        mp.DeviceId,
+                        mp.ParamId,
+                        m.DeviceName,
+                        p.ParamName
+                    FROM RMS.dbo.MachineParameter mp
+                    LEFT JOIN MES_DEV.dbo.MES_MACHINE m ON mp.DeviceId = m.DeviceID
+                    LEFT JOIN RMS.dbo.Parameter p ON mp.ParamId = p.ParamId
+                    Order by m.MpsSectionNo, mp.DeviceID ";
+
+                return conn.Query<MachineParameterView>(sql).ToList();
+            }
+        }
+
+
     }
 }

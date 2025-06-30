@@ -32,7 +32,7 @@ html {
     -ms-overflow-style: none;
 }
 /*#endregion*/
-/
+
 /*----------功能選單-----------------*/
 /*#region 功能選單列*/
 
@@ -201,6 +201,24 @@ main-header .navbar-right {
 
 /*#endregion*/
 
+.custom-easyui-button {
+    border: 1px solid #bbb;
+    background: linear-gradient(to bottom, #ffffff 0, #e6e6e6 100%);
+    background-repeat: repeat-x;
+    border-radius: 5px;
+    color: #444;
+    font-weight: bold;
+    padding: 5px;
+    margin: 5px;
+    display: flex;
+    vertical-align: middle;
+    text-align: center;
+    justify-content: center;
+    justify-items: center;
+    cursor: pointer;
+    width:fit-content;
+    min-width: 30px
+}
 
 
 /*----------提示選單-----------------*/
@@ -456,7 +474,6 @@ main-header .navbar-right {
 }
 
 .easyui-linkbutton {
-    width: 58px;
     font-size: 12px;
     font-weight: bold;
     margin: 0px;
@@ -814,3 +831,4 @@ main-header .navbar-right {
     background-color: #009abd !important;
 }
 /*#endregion */
+

@@ -7,15 +7,15 @@
     <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/icon.css")" />
 }
 
-<h2>配方清單</h2>
-<div id="toolbar" style="padding:5px;">
-    料號：<input id="searchProdNo" class="easyui-textbox" style="width:120px" data-options="prompt:'搜尋料號'" />
+<h2>機台參數清單</h2>
+<div id="toolbar" style="padding:5px; display:flex; align-items:center">
     機台：<input id="searchDevice" class="easyui-textbox" style="width:120px" data-options="prompt:'搜尋機台'" />
-    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-search" onclick="searchRecipes()">搜尋</a>
-    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-reload" onclick="clearSearch()">清除</a>
+    料號：<input id="searchProdNo" class="easyui-textbox" style="width:120px" data-options="prompt:'搜尋料號'" />
+    <div href="javascript:void(0)" class="custom-easyui-button" onclick="searchRecipes()">搜尋</div>
+    <div href="javascript:void(0)" class="custom-easyui-button" onclick="clearSearch()">清除</div>
 </div>
 
-<table id="recipeGrid" class="easyui-datagrid" style="width:100%;height:500px"
+<table id="recipeGrid" class="easyui-datagrid" style="width:100%"
        data-options="
          url: '@Url.Action("GetRecipes","RecipeManage")',
          method: 'get',
@@ -35,11 +35,11 @@
             <th data-options="field:'RecipeId',hidden:true">ID</th>
             <th data-options="field:'DeviceName',title:'機台',width:120">機台</th>
             <th data-options="field:'ProdNo',title:'料號',width:80">料號</th>
-            <th data-options="field:'ProdName',title:'品名',width:80">品名</th>
-            <th data-options="field:'MoldNo',title:'模具',width:80">模具</th>
             <th data-options="field:'MaterialNo',title:'原料',width:80">原料</th>
-            <th data-options="field:'CreateBy',title:'建立者',width:80">建立者</th>
-            <th data-options="field:'CreateDate',title:'建立時間',width:80, formatter:formatDate">建立時間</th>
+            <th data-options="field:'MoldNo',title:'模具',width:60">模具</th>
+            <th data-options="field:'Remark',title:'註記',width:100">註記</th>
+            <th data-options="field:'CreateBy',title:'建立者',width:60">建立者</th>
+            <th data-options="field:'CreateDate',title:'建立時間',width:60, formatter:formatDate">建立時間</th>
             <th data-options="field:'Version',title:'版次',width:30,align:'center'">版次</th>
             <th data-options="field:'IsActive',title:'啟用',width:30,align:'center',formatter:formatActive">啟用</th>
         </tr>
@@ -52,17 +52,27 @@
     <!-- 引入 detailview plugin -->
     <script src="~/Scripts/base/easyui/datagrid-detailview.js"></script>
     <script>
-    // 綠色勾勾格式化
+    function searchRecipes() {
+        const prodNo = $('#searchProdNo').textbox('getValue');
+        const deviceName = $('#searchDevice').textbox('getValue');
+        $('#recipeGrid').datagrid('load', {
+            prodNo: prodNo,
+            deviceName: deviceName
+        });
+    }
+    function clearSearch() {
+        $('#searchProdNo, #searchDevice').textbox('clear');
+        $('#recipeGrid').datagrid('load', {});
+    }
+
     function formatActive(val) {
       return val ? '<i class="fa fa-check" style="color:green"></i>' : '';
     }
 
-    // 在每一列下方先放一個空 DIV
     function detailFormatter(index,row){
       return '<div class="ddv" style="padding:10px 20px;"></div>';
     }
 
-    // 展開列時觸發：建立子 grid 並 loadData
     function onExpandRow(index,row){
       var parentGrid = $('#recipeGrid');
       var ddv = parentGrid.datagrid('getRowDetail',index)
@@ -77,19 +87,30 @@
         height: 'auto',
         columns:[[
           { field:'Index',  title:'#', width:30 },
-          { field:'ParamName',  title:'參數項目', width:200 },
+          { field:'ParamName',  title:'參數項目', width:150 },
           { field:'MaxValue', title:'上限值', width:100 },
           { field:'StdValue', title:'標準值', width:100 },
-          { field:'MinValue', title:'下限值', width:100 }
+          { field:'MinValue', title:'下限值', width:100 },
+          { field:'Unit', title:'單位', width:30 },
+          { field:'BiasMethod', title:'設定方式', width:100 },
+          { field:'BiasValue', title:'偏差值', width:100 },
+          { field:'AlarmFlag', title:'超規警報', width:60 }
         ]]
       });
       // 請求後端 JSON
       $.getJSON('@Url.Action("GetRecipeDetails","RecipeManage")', { recipeId: row.RecipeId }, function(res){
-        if (res.success) {
-          tbl.datagrid('loadData', res.rows);
-        }
-        // 調整主表 detail row 高度
-        parentGrid.datagrid('fixDetailRowHeight', index);
+          if (res.success && Array.isArray(res.rows)) {
+
+              res.rows.sort((a, b) => {
+                  return a.ParamName.localeCompare(b.ParamName, 'zh-Hant'); // 繁體中文排序
+              });
+
+              res.rows.forEach((row, i) => row.Index = i + 1);
+
+              tbl.datagrid('loadData', res.rows);
+          }
+
+          parentGrid.datagrid('fixDetailRowHeight', index);
       });
         }
 
@@ -108,21 +129,6 @@
             var dd = ('0' + date.getDate()).slice(-2);
 
             return `${yyyy}-${mm}-${dd}`;
-        }
-
-    </script>
-    <script>
-        function searchRecipes() {
-            const prodNo = $('#searchProdNo').textbox('getValue');
-            const deviceName = $('#searchDevice').textbox('getValue');
-            $('#recipeGrid').datagrid('load', {
-                prodNo: prodNo,
-                deviceName: deviceName
-            });
-        }
-        function clearSearch() {
-            $('#searchProdNo, #searchDevice').textbox('clear');
-            $('#recipeGrid').datagrid('load', {});
         }
 
     </script>

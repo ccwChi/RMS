@@ -1,5 +1,6 @@
 ﻿using System.Linq;
 using System.Web.Mvc;
+using RecipeManageSystem.Generic;
 using RecipeManageSystem.Models;
 using RecipeManageSystem.Repository;
 
@@ -8,6 +9,8 @@ namespace RecipeManageSystem.Controllers
     public class ParamController : Controller
     {
         private readonly ParamRepository _param = new ParamRepository();
+
+        [PermissionAuthorize]
         public ActionResult Index()
         {
             return View();
@@ -57,6 +60,7 @@ namespace RecipeManageSystem.Controllers
         }
 
         [HttpPost]
+        [PermissionAuthorize(1,2)]
         public JsonResult SaveParamDefinition(Parameter parameter)
         {
             if (parameter.ParamId == 0)

@@ -22,10 +22,9 @@
     </thead>
 </table>
 
-<div id="toolbar" style="padding:5px;">
-    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="openDialog()">新增</a>
-    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-edit" onclick="editDialog()">編輯</a>
-
+<div id="toolbar" style="padding:5px; display:flex; align-items:center">
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="openDialog()">新增</a>
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="editDialog()">編輯</a>
 </div>
 
 <!-- 新增/編輯 Dialog -->
@@ -50,9 +49,9 @@
         </div>
     </form>
 </div>
-<div id="dlg-buttons">
-    <a href="javascript:void(0)" class="easyui-linkbutton" onclick="saveRole()">儲存</a>
-    <a href="javascript:void(0)" class="easyui-linkbutton" onclick="$('#dlg').dialog('close')">取消</a>
+<div id="dlg-buttons" style="display:flex; justify-content:end">
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="saveRole()">儲存</a>
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="$('#dlg').dialog('close')">取消</a>
 </div>
 
 @section Scripts {

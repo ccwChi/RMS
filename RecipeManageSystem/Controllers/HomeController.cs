@@ -5,6 +5,7 @@ namespace RecipeManageSystem.Controllers
 {
     public class HomeController : Controller
     {
+        [PermissionAuthorize]
         public ActionResult Index()
         
         {

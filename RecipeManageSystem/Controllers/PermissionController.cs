@@ -13,11 +13,14 @@ namespace RecipeManageSystem.Controllers
     {
         private readonly PermissionRepository _permission = new PermissionRepository();
 
+        //[PermissionAuthorize(PermissionId = 6)]
+        [PermissionAuthorize]
         public ActionResult RoleList()
         {
             return View("~/Views/Permission/RoleList.cshtml");
         }
 
+        [PermissionAuthorize]
         // 使用者帳號與權限管理頁
         public ActionResult UserList()
         {
@@ -62,6 +65,7 @@ namespace RecipeManageSystem.Controllers
         }
 
         [HttpPost]
+        [PermissionAuthorize(5)]
         public JsonResult SaveRole(Role dto)
         {
             bool success;
@@ -108,6 +112,7 @@ namespace RecipeManageSystem.Controllers
 
 
         [HttpPost]
+        [PermissionAuthorize(6)]
         public JsonResult SaveUser(User user)
         {
             // 1. 檢查必填
@@ -138,6 +143,7 @@ namespace RecipeManageSystem.Controllers
                         UserName = user.UserName,
                         DepartmentName = user.DepartmentName,
                         RoleId = user.RoleId,
+                        Email = user.Email,
                         IsActive = user.IsActive,
                         UpdateDate = DateTime.Now,
                         UpdateBy = operatorUserNo
@@ -155,6 +161,7 @@ namespace RecipeManageSystem.Controllers
                         UserNo = user.UserNo,
                         UserName = user.UserName,
                         DepartmentName = user.DepartmentName,
+                        Email = user.Email,
                         RoleId = user.RoleId,
                         IsActive = user.IsActive,
                         CreateDate = DateTime.Now,  

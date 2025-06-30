@@ -1,7 +1,120 @@
-﻿
-@{
-    ViewBag.Title = "Index";
+﻿@{
+    ViewBag.Title = "警報設定";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+@section css{
+  <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/bootstrap/easyui.css")" />
+  <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/icon.css")" />
 }
 
-<h2>Index</h2>
+<h2>警報設定：接收工號清單</h2>
 
+<div id="toolbar" style="padding:5px 0; display:flex; align-items:center">
+    <div href="javascript:void(0)" class="custom-easyui-button" onclick="openUserDlg()">新增工號</div>
+    <div href="javascript:void(0)" class="custom-easyui-button" onclick="deleteUser()">刪除選取</div>
+</div>
+
+<table id="alertGrid" class="easyui-datagrid" style="width:100%;height:400px"
+       data-options="
+         url: '@Url.Action("GetAlertUsers","AlarmManage")',
+         method:'get',
+         toolbar:'#toolbar',
+         pagination:false,
+         rownumbers:true,
+         singleSelect:true,
+         fitColumns:true">
+  <thead>
+    <tr>
+      <th data-options="field:'AlertId',hidden:true">ID</th>
+      <th data-options="field:'UserNo',title:'工號',width:100,align:'center'">工號</th>
+      <th data-options="field:'CreateBy',title:'建立者',width:100">建立者</th>
+      <th data-options="field:'CreateDate',title:'建立時間',width:150,formatter:formatDate">時間</th>
+    </tr>
+  </thead>
+</table>
+
+<!-- 新增 Dialog -->
+<div id="userDlg" class="easyui-dialog" closed="true" modal="true" title="新增接收工號"
+     style="width:300px;padding:10px" buttons="#dlgButtons">
+  <form id="userForm" method="post">
+    <div style="margin-bottom:10px">
+      <label>工號：</label>
+      <input name="UserNo" class="easyui-textbox" required="true" style="width:180px" />
+    </div>
+  </form>
+</div>
+<div id="dlgButtons" style="text-align:center;padding:5px">
+  <a href="javascript:void(0)" class="custom-easyui-button" onclick="saveUser()">儲存</a>
+  <a href="javascript:void(0)" class="custom-easyui-button" onclick="$('#userDlg').dialog('close')">取消</a>
+</div>
+
+@section Scripts{
+<script src="~/Scripts/base/easyui/jquery.easyui.min.js"></script>
+<script>
+  // 格式化時間
+    function formatDate(value) {
+        if (!value) return '';
+
+        // 抓出 timestamp 數字部分
+        var matches = /\/Date\((\d+)\)\//.exec(value);
+        if (!matches) return '';
+
+        var timestamp = parseInt(matches[1], 10);
+        var date = new Date(timestamp);
+
+        var yyyy = date.getFullYear();
+        var mm = ('0' + (date.getMonth() + 1)).slice(-2);
+        var dd = ('0' + date.getDate()).slice(-2);
+
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+  // 開啟「新增工號」Dialog
+  function openUserDlg(){
+    $('#userForm').form('clear');
+    $('#userDlg').dialog('open');
+  }
+
+  // 儲存一筆新工號
+  function saveUser(){
+    $('#userForm').form('submit', {
+      url: '@Url.Action("SaveAlertUser", "AlarmManage")',
+      onSubmit: function(){
+        return $(this).form('validate');
+      },
+      success: function(res){
+        var data = JSON.parse(res);
+        if (data.success){
+          $('#userDlg').dialog('close');
+          $('#alertGrid').datagrid('reload');
+        } else {
+          $.messager.alert('錯誤', data.message || '儲存失敗');
+        }
+      }
+    });
+  }
+
+  // 刪除所選工號
+  function deleteUser(){
+    var row = $('#alertGrid').datagrid('getSelected');
+    if (!row) return $.messager.alert('提示','請先選擇一筆');
+    $.messager.confirm('確認','確定要刪除此工號？',function(ok){
+      if (!ok) return;
+      $.post('@Url.Action("DeleteAlertUser", "AlarmManage")',
+        { alertId: row.AlertId },
+        function(res){
+          if (res.success){
+            $('#alertGrid').datagrid('reload');
+          } else {
+            $.messager.alert('錯誤', res.message||'刪除失敗');
+          }
+        },'json');
+    });
+  }
+
+  // 初始載入
+  $(function(){
+    $('#alertGrid').datagrid(); 
+  });
+</script>
+}

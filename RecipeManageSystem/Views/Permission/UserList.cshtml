@@ -13,9 +13,10 @@
 <table id="userGrid" class="easyui-datagrid" style="width:100%;">
     <thead>
         <tr>
-            <th data-options="field:'UserName',width:100,align:'left'">人員名稱</th>
-            <th data-options="field:'UserNo',width:80,align:'left'">人員工號</th>
-            <th data-options="field:'DepartmentName',width:100,align:'left'">人員部門</th>
+            <th data-options="field:'UserNo',width:80,align:'left'">工號</th>
+            <th data-options="field:'UserName',width:100,align:'left'">名稱</th>
+            <th data-options="field:'DepartmentName',width:100,align:'left'">部門</th>
+            <th data-options="field:'Email',width:100,align:'left'">信箱</th>
             <th data-options="field:'RoleId',width:80,align:'left',formatter:formatRole">權限角色</th>
             <th data-options="field:'IsActive',width:60,align:'center',formatter:formatActive">是否啟用</th>
             <th data-options="field:'Opt',width:60,align:'center',formatter:formatActive">編輯</th>
@@ -23,8 +24,8 @@
     </thead>
 </table>
 
-<div id="toolbar" style="padding:5px;">
-    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="openUserDialog()">新增</a>
+<div id="toolbar" style="padding:5px; display:flex; align-items:center">
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="openUserDialog()">新增</a>
 </div>
 
 <!-- 新增／編輯 Dialog -->
@@ -33,13 +34,14 @@
         <!-- 只留一個 combobox，讓使用者從「全體員工」裡選一筆 -->
         <div style="margin-bottom:10px">
             <label>選擇員工：</label>
-            <select id="EmployeeSelect"  class="easyui-combobox" data-options="panelHeight:'200px' " style="width:100%" name="UserNo"></select>
+            <select id="EmployeeSelect"  class="easyui-combobox" style="width:100%" name="UserNo"></select>
 
         </div>
 
         <!-- 隱藏欄位：UserName, DepartmentName -->
         <input type="hidden" name="UserName" id="UserName" />
         <input type="hidden" name="DepartmentName" id="DepartmentName" />
+        <input type="hidden" name="Email" id="Email" />
 
         <!-- 接著再選「角色」和「是否啟用」 -->
         <div style="margin-bottom:10px">
@@ -55,9 +57,9 @@
         </div>
     </form>
 </div>
-<div id="userDlg-buttons">
-    <a href="javascript:void(0)" class="easyui-linkbutton" onclick="saveUser()">儲存</a>
-    <a href="javascript:void(0)" class="easyui-linkbutton" onclick="$('#userDlg').dialog('close')">取消</a>
+<div id="userDlg-buttons" style="display:flex; justify-content:end">
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="saveUser()">儲存</a>
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="$('#userDlg').dialog('close')">取消</a>
 </div>
 
 @section Scripts {
@@ -102,8 +104,9 @@
                             value: u.UserNo,
                             // text 可以放「工號 姓名 部門」，讓下拉列表看得一目了然，filter 也能模糊匹配
                             text:  `${u.UserNo}　${u.UserName}　(${u.DepartmentName})`,
-                            UserName:       u.UserName,
-                            DepartmentName: u.DepartmentName
+                            UserName:  u.UserName,
+                            Email: u.Email,
+                            DepartmentName: u.DepartmentName,
                         }));
                     } else {
                         alert('無法載入員工名單');
@@ -128,9 +131,10 @@
                     };
                 },
                 columns: [[
-                    { field: 'UserName', title: '人員名稱', width: 100, align: 'left' },
-                    { field: 'UserNo', title: '人員工號', width: 80, align: 'left' },
-                    { field: 'DepartmentName', title: '人員部門', width: 100, align: 'left' },
+                    { field: 'UserNo', title: '工號', width: 80, align: 'left' },
+                    { field: 'UserName', title: '名稱', width: 80, align: 'left' },
+                    { field: 'DepartmentName', title: '部門', width: 100, align: 'left' },
+                    { field: 'Email', title: '信箱', width: 120, align: 'left' },
                     { field: 'RoleId', title: '權限角色', width: 80, align: 'left', formatter: formatRole },
                     {
                         field: 'IsActive', title: '是否啟用', width: 80, align: 'center',
@@ -175,13 +179,6 @@
 
         // 開啟「新增使用者」Dialog
         function openUserDialog() {
-            // 開啟 Dialog 之前，先確定 employeeOptions 已經準備好
-            // -----------------------------------------------
-            // 假設 employeeOptions = [
-            //   { value: 'A001', text: 'A001 王小明 (資訊部)', UserName: '王小明', DepartmentName: '資訊部' },
-            //   { value: 'A002', text: 'A002 陳小華 (財務部)', UserName: '陳小華', DepartmentName: '財務部' },
-            //   ...
-            // ];
 
             $('#userDlg').dialog('open').dialog('setTitle', '新增使用者');
             $('#userForm').form('clear');
@@ -191,7 +188,7 @@
                 data: employeeOptions,          // 直接把整個陣列傳進去
                 valueField: 'value',            // 物件中的 value 欄位作為 combobox 的值
                 textField: 'text',              // 物件中的 text 欄位作為 combobox 顯示文字
-                panelHeight: 'auto',            // 自動高度
+                panelHeight: '300',            // 自動高度
                 filter: function (q, row) {
                     // q = 使用者目前在輸入框輸的文字
                     // row.text = 該筆項目完整顯示文字 (例如 "A001 王小明 (資訊部)")
@@ -201,6 +198,7 @@
                     // 當使用者選定某筆後，rec.UserName / rec.DepartmentName 就是該筆的資料
                     $('#UserName').val(rec.UserName);
                     $('#DepartmentName').val(rec.DepartmentName);
+                    $('#Email').val(rec.Email);
                 }
             });
             // 2. 清空 combobox 的預設選擇（若從編輯頁面繼承過來，務必先 clear）
@@ -298,7 +296,8 @@ function editUserDialog() {
                 payload[f.name] = f.value;
             });
             // UserName、DepartmentName 是隱藏欄位
-            payload.UserName       = $('#UserName').val();
+            payload.UserName       = $('#UserName').val(); 
+            payload.Email          = $('#Email').val();
             payload.DepartmentName = $('#DepartmentName').val();
             payload.IsActive       = $('#IsActive').is(':checked');
 

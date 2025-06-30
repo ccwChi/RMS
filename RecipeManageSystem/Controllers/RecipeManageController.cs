@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Web;
 using System.Web.Mvc;
+using Newtonsoft.Json;
+using RecipeManageSystem.Generic;
 using RecipeManageSystem.Models;
 using RecipeManageSystem.Repository;
 
@@ -12,45 +15,46 @@ namespace RecipeManageSystem.Controllers
     {
         private readonly MachineParamRepository _machineParam = new MachineParamRepository();
         private readonly RecipeManageRepository _recipeManage = new RecipeManageRepository();
+
+        [PermissionAuthorize]
         public ActionResult Edit()
         {
             return View();
         }
 
+        [PermissionAuthorize]
         public ActionResult List()
         {
             return View();  
         }
 
         [HttpGet]
-        public JsonResult GetParamDetailToEdit(string deviceId, string prodNo, string materialNo="", string moldNo = "")
+        public JsonResult GetDetailToEdit(string deviceId, string prodNo, string materialNo = "", string moldNo = "")
         {
-            // 只要取該機台目前所有 ParamId
-            var paramDetails = _recipeManage.GetParamDetailToEdit(deviceId, prodNo, materialNo, moldNo);
+            // 1. 先撈出這組鍵值所有 RecipeHeader / RecipeDetail
+            var versions = _recipeManage.GetRecipeVersions(deviceId, prodNo, materialNo, moldNo);
+
             return Json(new
             {
                 success = true,
-                data = new
-                {
-                    DeviceID = deviceId,
-                    Params = paramDetails
-                }
+                data = versions.Select(v => new {
+                    v.RecipeId,
+                    v.DeviceId,
+                    v.MoldNo,
+                    v.MaterialNo,
+                    v.ProdNo,
+                    v.Version,
+                    v.Remark,        
+                    v.CreateBy,
+                    v.CreateDate,
+                    v.UpdateBy,
+                    v.UpdateDate,
+                    Params = v.Params // 這版本的參數明細
+                })
             }, JsonRequestBehavior.AllowGet);
         }
 
-        //[HttpGet]
-        //public JsonResult GetRecipes(int page = 1, int rows = 10000)
-        //{
-        //    var all = _recipeManage.GetRecipes();
-        //    // 簡易分頁（也可改成 SQL 分頁）
-        //    var paged = all.Skip((page - 1) * rows).Take(rows).ToList();
-        //    return Json(new
-        //    {
-        //        success = true,
-        //        total = all.Count,
-        //        rows = paged
-        //    }, JsonRequestBehavior.AllowGet);
-        //}
+
         [HttpGet]
         public JsonResult GetRecipes(string prodNo, string deviceName, int page = 1, int rows = 50)
         {
@@ -80,15 +84,25 @@ namespace RecipeManageSystem.Controllers
             }, JsonRequestBehavior.AllowGet);
         }
 
+
         [HttpPost]
-        public JsonResult SaveRecipe(RecipeTotalDto dto)
+        [ValidateInput(false)] // 避免 MVC 自動擋掉包含 HTML 的內容
+        [PermissionAuthorize(3)]
+        public JsonResult SaveRecipe()
         {
-            // 取當前登入者帳號
+            string json;
+            using (var reader = new StreamReader(Request.InputStream))
+            {
+                Request.InputStream.Position = 0; // 確保從開頭讀
+                json = reader.ReadToEnd();
+            }
+
+            // 這裡使用 Json.NET（Newtonsoft.Json）反序列化
+            var dto = JsonConvert.DeserializeObject<RecipeTotalDto>(json);
+
             var userName = User?.Identity?.Name ?? "Unknown";
+            var ok = _recipeManage.SaveRecipe(dto, dto.Mode, userName);
 
-            string mode = dto.Mode;
-
-            var ok = _recipeManage.SaveRecipe(dto, mode, userName);
             return Json(new { success = ok });
         }
 

@@ -23,7 +23,7 @@ namespace MeasrueVendor.Repository
             ].ConnectionString;
 
             rmsString = ConfigurationManager.ConnectionStrings[
-                (EnvFlag == "1") ? "RMSConnection" : "RMSConnection"
+                (EnvFlag == "1") ? "RMSConnection" : "RMS_DEVConnection"
             ].ConnectionString;
         }
     }

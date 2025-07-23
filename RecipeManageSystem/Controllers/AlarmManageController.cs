@@ -12,6 +12,7 @@ namespace RecipeManageSystem.Controllers
     public class AlarmManageController : Controller
     {
         private readonly AlarmManageRepository _alarmManage = new AlarmManageRepository();
+        private readonly PermissionRepository _permission = new PermissionRepository();
         // GET: AlarmManage
 
         [PermissionAuthorize]
@@ -21,35 +22,67 @@ namespace RecipeManageSystem.Controllers
         }
 
 
+        [HttpGet]
+        public JsonResult GetMachineGroups()
+        {
+            var list = _alarmManage.GetMachineGroups();
+            return Json(new { total = list.Count, rows = list }, JsonRequestBehavior.AllowGet);
+        }
 
         [HttpGet]
-        public JsonResult GetAlertUsers()
+        public JsonResult GetMachineGroupsById(int id)
         {
-            List<AlertUser> rows = _alarmManage.GetAlertUsers();
-            return Json(new { success = true, rows }, JsonRequestBehavior.AllowGet);
+            var deviceIds = _alarmManage.GetMachineGroupsById(id);
+            return Json(new { success = true, data = deviceIds }, JsonRequestBehavior.AllowGet);
         }
 
         [HttpPost]
-        public JsonResult SaveAlertUser(string UserNo)
+        public JsonResult SaveMachineGroup(MachineGroup dto)
         {
-            if (string.IsNullOrWhiteSpace(UserNo))
-                return Json(new { success = false, message = "工號不可為空" });
-
-
-            var cp = User as CustomPrincipal;
-            string currentUser = cp?.UserName ?? User.Identity.Name ?? "system";
-
-            bool ok = _alarmManage.InsertAlertUser(UserNo, currentUser);
-            return Json(new { success = ok });
+            var user = (User as CustomPrincipal)?.UserName ?? User.Identity.Name ?? "system";
+            var newId = _alarmManage.SaveMachineGroup(
+                dto.MachineGroupId, dto.GroupName, dto.Description, dto.Devices, user
+            );
+            return Json(new { success = true, groupId = newId });
         }
 
         [HttpPost]
-        public JsonResult DeleteAlertUser(int alertId)
+        public JsonResult DeleteMachineGroup(int id)
         {
-            bool ok = _alarmManage.DeleteAlertUser(alertId);
+            var ok = _alarmManage.DeleteMachineGroup(id);
             return Json(new { success = ok });
         }
 
 
+        [HttpGet]
+        public JsonResult GetAlertGroups()
+        {
+            return null;
+        }
+
+
+
+
+        [HttpGet]
+        public JsonResult GetRoles()
+        {
+            var roles = _permission.GetRoles(); // 取得 List<RoleDto> 
+            return Json(roles, JsonRequestBehavior.AllowGet);
+        }
+
+        [HttpGet]
+        public JsonResult GetAlertGroupRoles(int id)
+        {
+            var roleIds = _alarmManage.GetAlertGroupRoles(id); // 取得 List<int>
+            return Json(new { success = true, data = roleIds }, JsonRequestBehavior.AllowGet);
+        }
+
+        [HttpPost]
+        public JsonResult SaveGroup(AlertGroupDto dto)
+        {
+            var user = (User as CustomPrincipal)?.UserName ?? "system";
+            _alarmManage.SaveAlertGroup(dto, user);
+            return Json(new { success = true });
+        }
     }
 }

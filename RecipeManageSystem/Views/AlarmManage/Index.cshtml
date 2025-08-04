@@ -1,120 +1,279 @@
 ﻿@{
-    ViewBag.Title = "警報設定";
+    ViewBag.Title = "警報群組設定";
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 @section css{
-  <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/bootstrap/easyui.css")" />
-  <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/icon.css")" />
+    <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/bootstrap/easyui.css")" />
+    <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/icon.css")" />
 }
 
-<h2>警報設定：接收工號清單</h2>
 
-<div id="toolbar" style="padding:5px 0; display:flex; align-items:center">
-    <div href="javascript:void(0)" class="custom-easyui-button" onclick="openUserDlg()">新增工號</div>
-    <div href="javascript:void(0)" class="custom-easyui-button" onclick="deleteUser()">刪除選取</div>
-</div>
-
-<table id="alertGrid" class="easyui-datagrid" style="width:100%;height:400px"
-       data-options="
-         url: '@Url.Action("GetAlertUsers","AlarmManage")',
-         method:'get',
-         toolbar:'#toolbar',
-         pagination:false,
-         rownumbers:true,
-         singleSelect:true,
-         fitColumns:true">
-  <thead>
-    <tr>
-      <th data-options="field:'AlertId',hidden:true">ID</th>
-      <th data-options="field:'UserNo',title:'工號',width:100,align:'center'">工號</th>
-      <th data-options="field:'CreateBy',title:'建立者',width:100">建立者</th>
-      <th data-options="field:'CreateDate',title:'建立時間',width:150,formatter:formatDate">時間</th>
-    </tr>
-  </thead>
-</table>
-
-<!-- 新增 Dialog -->
-<div id="userDlg" class="easyui-dialog" closed="true" modal="true" title="新增接收工號"
-     style="width:300px;padding:10px" buttons="#dlgButtons">
-  <form id="userForm" method="post">
-    <div style="margin-bottom:10px">
-      <label>工號：</label>
-      <input name="UserNo" class="easyui-textbox" required="true" style="width:180px" />
+<div class="easyui-layout" style="width:100%; height:98%">
+    <!-- 左邊：群組列表 -->
+    <div data-options="region:'west',split:true" title="群組列表" style="width:400px;padding:5px">
+        <table id="groupGrid" class="easyui-datagrid" style="width:100%"
+               data-options="
+             url:'@Url.Action("GetAlertGroups","AlarmManage")',
+             method:'get',
+             singleSelect:true,
+             @*onSelect: onGroupSelect,*@
+             toolbar:'#groupToolbar',
+             fitColumns:true">
+            <thead>
+                <tr>
+                    <th data-options="field:'AlertGroupId',hidden:true"></th>
+                    <th data-options="field:'GroupName',title:'群組名稱',width:150"></th>
+                    <th data-options="field:'GroupName',title:'機台群組',width:30"></th>
+                    <th data-options="field:'GroupName',title:'人員群組',width:30"></th>
+                </tr>
+            </thead>
+        </table>
+        <div id="groupToolbar" style="display:flex; align-items:center">
+            <a href="javascript:void(0)" class="custom-easyui-button" onclick="openGroupDlg()">新增</a>
+            <a href="javascript:void(0)" class="custom-easyui-button" onclick="editGroup()">編輯</a>
+            <a href="javascript:void(0)" class="custom-easyui-button" onclick="deleteGroup()">刪除</a>
+        </div>
     </div>
-  </form>
+
+    <!-- 右邊：分區顯示該群組的機台 & 使用者 -->
+    <div data-options="region:'center'" style="padding:0px">
+        <div data-options="region:'center'" style="padding:0px">
+            <div class="easyui-layout" style="width:100%;height:100%">
+                <!-- 右上：機台群組管理 -->
+                <div data-options="region:'north',split:true" title="機台群組管理" style="height:95%;padding:5px">
+                    <table id="machineGroupGrid" class="easyui-datagrid" style="width:100%"
+                           data-options="
+                             url:'@Url.Action("GetMachineGroups","AlarmManage")',
+                             method:'get',
+                             singleSelect:true,
+                             onSelect:onMGSelect,
+                             toolbar:'#mgToolbar',
+                             fitColumns:true">
+                        <thead>
+                            <tr>
+                                <th data-options="field:'GroupId',hidden:true"></th>
+                                <th data-options="field:'GroupName',title:'群組名稱',width:150"></th>
+                                <th data-options="field:'Description',title:'描述',width:150"></th>
+                            </tr>
+                        </thead>
+                    </table>
+                    <div id="mgToolbar" style="display:flex; gap:5px">
+                        <a href="javascript:void(0)" class="custom-easyui-button" onclick="openMGDlg()">新增</a>
+                        <a href="javascript:void(0)" class="custom-easyui-button" onclick="editMG()">編輯</a>
+                        <a href="javascript:void(0)" class="custom-easyui-button" onclick="deleteMG()">刪除</a>
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+
+    </div>
 </div>
-<div id="dlgButtons" style="text-align:center;padding:5px">
-  <a href="javascript:void(0)" class="custom-easyui-button" onclick="saveUser()">儲存</a>
-  <a href="javascript:void(0)" class="custom-easyui-button" onclick="$('#userDlg').dialog('close')">取消</a>
+<!-- Dialog：新增／編輯 機台群組 -->
+<div id="dlgMG" class="easyui-dialog" closed="true" modal="true" buttons="#dlgMGBtns"
+     style="height:80% ;width:600px;padding:10px">
+    <form id="formMG" method="post" style="margin-bottom:10px">
+        <input name="GroupId" type="hidden" />
+        <div style="margin-bottom:8px;">
+            <label>群組名稱：</label>
+            <input name="GroupName" class="easyui-textbox" required="true" style="width:400px" />
+        </div>
+        <div style="margin-bottom:8px;">
+            <label>描述：</label>
+            <input name="Description" class="easyui-textbox" style="width:400px" />
+        </div>
+    </form>
+
+    <h4>選擇機台（勾選即屬於此群組）</h4>
+    <table id="allMachineGrid" class="easyui-datagrid" style="width:100%;height:300px"
+           data-options="singleSelect:false,checkbox:true,fitColumns:true">
+        <thead>
+            <tr>
+                <th data-options="field:'ck',checkbox:true"></th>
+                <th data-options="field:'DeviceId',title:'機台編號',width:100"></th>
+                <th data-options="field:'DeviceName',title:'機台名稱',width:200"></th>
+            </tr>
+        </thead>
+    </table>
 </div>
+<div id="dlgMGBtns" style="text-align:center;padding:5px; display:flex">
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="saveMG()">儲存</a>
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="$('#dlgMG').dialog('close')">取消</a>
+</div>
+
 
 @section Scripts{
-<script src="~/Scripts/base/easyui/jquery.easyui.min.js"></script>
-<script>
-  // 格式化時間
-    function formatDate(value) {
-        if (!value) return '';
+    <script src="~/Scripts/base/easyui/jquery.easyui.min.js"></script>
+    <script>
+    let currentMGId = null;
 
-        // 抓出 timestamp 數字部分
-        var matches = /\/Date\((\d+)\)\//.exec(value);
-        if (!matches) return '';
+        $(function(){
+          initMachineGroupGrid();
+          initMGDialog();
+        });
 
-        var timestamp = parseInt(matches[1], 10);
-        var date = new Date(timestamp);
+        function initMachineGroupGrid(){
+          $('#machineGroupGrid').datagrid({
+            url: '@Url.Action("GetMachineGroups","AlarmManage")',
+            method: 'get',
+            singleSelect: true,
+            fitColumns: true,
+            onSelect: onMGSelect,
+            onDblClickRow: function(index,row){
+              $('#machineGroupGrid').datagrid('selectRow', index);
+              editMG();
+            }
+          });
+        }
 
-        var yyyy = date.getFullYear();
-        var mm = ('0' + (date.getMonth() + 1)).slice(-2);
-        var dd = ('0' + date.getDate()).slice(-2);
+        function initMGDialog(){
+          $('#allMachineGrid').datagrid({
+            singleSelect: false,
+            checkbox: true,
+            fitColumns: true
+          });
+        }
 
-        return `${yyyy}-${mm}-${dd}`;
+    function onMGSelect(index, row){
+      currentMGId = row.MachineGroupId;
+      console.log('選擇群組:', currentMGId);
+      // 你可以顯示描述或額外資訊
     }
 
-  // 開啟「新增工號」Dialog
-  function openUserDlg(){
-    $('#userForm').form('clear');
-    $('#userDlg').dialog('open');
-  }
+    function openMGDlg(){
+      currentMGId = null;
+      $('#formMG').form('clear');
+      $('#dlgMG').dialog('open').dialog('setTitle','新增機台群組');
+      loadAllMachines([]);
+    }
 
-  // 儲存一筆新工號
-  function saveUser(){
-    $('#userForm').form('submit', {
-      url: '@Url.Action("SaveAlertUser", "AlarmManage")',
-      onSubmit: function(){
-        return $(this).form('validate');
-      },
-      success: function(res){
-        var data = JSON.parse(res);
-        if (data.success){
-          $('#userDlg').dialog('close');
-          $('#alertGrid').datagrid('reload');
-        } else {
-          $.messager.alert('錯誤', data.message || '儲存失敗');
+    function editMG(){
+      const row = $('#machineGroupGrid').datagrid('getSelected');
+      if(!row) return $.messager.alert('提示','請先選擇一筆');
+      currentMGId = row.MachineGroupId;
+      console.log('編輯群組:', currentMGId);
+
+      $('#formMG').form('load', row);
+      $('#dlgMG').dialog('open').dialog('setTitle','編輯機台群組');
+
+      $.get('@Url.Action("GetMachineGroupsById", "AlarmManage")', { id: currentMGId }, res => {
+        if(res.success){
+          const memberIds = res.data;
+          loadAllMachines(memberIds);
         }
-      }
-    });
-  }
+      });
+    }
 
-  // 刪除所選工號
-  function deleteUser(){
-    var row = $('#alertGrid').datagrid('getSelected');
-    if (!row) return $.messager.alert('提示','請先選擇一筆');
-    $.messager.confirm('確認','確定要刪除此工號？',function(ok){
-      if (!ok) return;
-      $.post('@Url.Action("DeleteAlertUser", "AlarmManage")',
-        { alertId: row.AlertId },
-        function(res){
-          if (res.success){
-            $('#alertGrid').datagrid('reload');
-          } else {
-            $.messager.alert('錯誤', res.message||'刪除失敗');
+    function loadAllMachines(memberIds){
+      $.get('@Url.Action("GetMachineList","MachineManage")', res => {
+        const data = res.data.map(r=>({
+          DeviceId: r.DeviceID,
+          DeviceName: r.DeviceName
+        }));
+        $('#allMachineGrid').datagrid('loadData', data);
+
+        data.forEach((r,i)=>{
+          if(memberIds.includes(r.DeviceId)){
+            $('#allMachineGrid').datagrid('checkRow', i);
           }
-        },'json');
-    });
-  }
+        });
+      });
+    }
 
-  // 初始載入
-  $(function(){
-    $('#alertGrid').datagrid(); 
-  });
-</script>
+    function saveMG(){
+      const name = $('#formMG input[name=GroupName]').val();
+      const desc = $('#formMG input[name=Description]').val();
+      const devs = $('#allMachineGrid').datagrid('getChecked').map(r => r.DeviceId);
+
+      if(!name) return $.messager.alert('提示','請輸入群組名稱');
+
+      console.log('送出:', { name, desc, devs });
+
+      $.ajax({
+        url: '@Url.Action("SaveMachineGroup", "AlarmManage")',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+          MachineGroupId: currentMGId || 0,
+          GroupName: name,
+          Description: desc,
+          Devices: devs
+        }),
+        success: res => {
+          if(res.success){
+            $('#dlgMG').dialog('close');
+            $('#machineGroupGrid').datagrid('reload');
+          } else {
+            $.messager.alert('錯誤','儲存失敗');
+          }
+        }
+      });
+    }
+
+    function deleteMG(){
+      const row = $('#machineGroupGrid').datagrid('getSelected');
+      if(!row) return $.messager.alert('提示','請先選擇一筆');
+      $.messager.confirm('確認','確定刪除這個群組？', ok => {
+        if(!ok) return;
+        $.post('@Url.Action("DeleteMachineGroup","AlarmManage")',
+          { id: row.MachineGroupId },
+          r => {
+            if(r.success){
+              $.messager.show({ title:'訊息', msg:'刪除成功' });
+              $('#machineGroupGrid').datagrid('reload');
+            } else {
+              $.messager.alert('錯誤','刪除失敗');
+            }
+          },
+          'json'
+        );
+      });
+    }
+
+    </script>
+    <script>
+        function saveGroup(){
+          const roles = $('#roleSelect').combobox('getValues'); // ex: ["1","2"]
+          const formData = $('#formGroup').serializeArray();
+          const data = {};
+          formData.forEach(f => data[f.name] = f.value);
+          data.Roles = roles;
+
+          console.log('送出資料:', data);
+
+          $.ajax({
+            url: '@Url.Action("SaveGroup","AlarmManage")',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: res => {
+              if(res.success){
+                $('#dlgGroup').dialog('close');
+                $('#groupGrid').datagrid('reload');
+              } else {
+                $.messager.alert('錯誤','儲存失敗');
+              }
+            }
+          });
+        }
+
+        function editGroup(){
+          const row = $('#groupGrid').datagrid('getSelected');
+          if(!row) return $.messager.alert('提示','請先選擇一筆');
+          $('#formGroup').form('load', row);
+          $('#dlgGroup').dialog('open').dialog('setTitle','編輯警報群組');
+
+          $.get('@Url.Action("GetAlertGroupRoles","AlarmManage")', { id: row.AlertGroupId }, res => {
+            if(res.success){
+              $('#roleSelect').combobox('setValues', res.data); // res.data = [1,3,4]
+            }
+          });
+        }
+
+
+    </script>
+
+
 }
+

@@ -55,15 +55,6 @@ namespace RecipeManageSystem.Controllers
 
 
         [HttpGet]
-        public JsonResult GetAlertGroups()
-        {
-            return null;
-        }
-
-
-
-
-        [HttpGet]
         public JsonResult GetRoles()
         {
             var roles = _permission.GetRoles(); // 取得 List<RoleDto> 
@@ -77,12 +68,82 @@ namespace RecipeManageSystem.Controllers
             return Json(new { success = true, data = roleIds }, JsonRequestBehavior.AllowGet);
         }
 
+        [HttpGet]
+        public JsonResult GetAlertGroups()
+        {
+            var groups = _alarmManage.GetAlertGroups(); // 需要在 Repository 中實作
+            return Json(new
+            {
+                success = true,
+                total = groups.Count,
+                rows = groups
+            }, JsonRequestBehavior.AllowGet);
+        }
+
+
+        [HttpGet]
+        public JsonResult GetAlertGroupDetail(int id)
+        {
+            var detail = _alarmManage.GetAlertGroupDetail(id);
+            return Json(new
+            {
+                success = true,
+                data = detail
+            }, JsonRequestBehavior.AllowGet);
+        }
+
+        [HttpGet]
+        public JsonResult GetMachineGroupsForSelect()
+        {
+            var groups = _alarmManage.GetMachineGroupsWithDevices();
+            return Json(new
+            {
+                success = true,
+                data = groups.Select(g => new {
+                    MachineGroupId = g.MachineGroupId,
+                    GroupName = g.GroupName,
+                    Description = $"{g.Description} ({g.DeviceCount}台機台: {g.DeviceList})"
+                })
+            }, JsonRequestBehavior.AllowGet);
+        }
+
+        [HttpPost]
+        public JsonResult ToggleGroupActive(int AlertGroupId, bool IsActive)
+        {
+            try
+            {
+                var user = (User as CustomPrincipal)?.UserName ?? "system";
+                var success = _alarmManage.ToggleAlertGroupActive(AlertGroupId, IsActive, user);
+                return Json(new { success });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+
+        [HttpPost]
+        public JsonResult DeleteAlertGroup(int id)
+        {
+            var ok = _alarmManage.DeleteAlertGroup(id);
+            return Json(new { success = ok });
+        }
+
+        // 修改現有的 SaveGroup 方法
         [HttpPost]
         public JsonResult SaveGroup(AlertGroupDto dto)
         {
-            var user = (User as CustomPrincipal)?.UserName ?? "system";
-            _alarmManage.SaveAlertGroup(dto, user);
-            return Json(new { success = true });
+            try
+            {
+                var user = (User as CustomPrincipal)?.UserName ?? "system";
+                _alarmManage.SaveAlertGroup(dto, user);
+                return Json(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
         }
     }
 }

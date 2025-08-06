@@ -1,0 +1,585 @@
+﻿@{
+    ViewBag.Title = "機台參數統一管理";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+@section css{
+    <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/bootstrap/easyui.css")" />
+    <link rel="stylesheet" href="@Url.Content("~/Scripts/base/easyui/themes/icon.css")" />
+    <style>
+        .custom-easyui-button.secondary {
+            background: linear-gradient(to bottom, #e6f3ff 0, #cce7ff 100%);
+            border-color: #66b3ff;
+            color: #0066cc;
+        }
+
+        .custom-easyui-button.danger {
+            background: linear-gradient(to bottom, #ffe6e6 0, #ffcccc 100%);
+            border-color: #ff6666;
+            color: #cc0000;
+        }
+
+        .custom-easyui-button:hover {
+            opacity: 0.8;
+        }
+    </style>
+}
+
+<h5>機台參數統一管理</h5>
+
+<div style="display: flex; height: calc(100vh - 200px); gap: 10px; min-height: 425px;">
+    <!-- 左側：過濾器與清單 -->
+    <div style="min-width: 450px; width: 40%; display: flex; flex-direction: column;">
+        <!-- 過濾區域 -->
+        <div style="margin-bottom: 10px; padding: 10px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 5px;">
+            <div style="display: flex; gap: 5px; align-items: center; margin-bottom: 8px;">
+                <label style="width: 50px; display: inline-block; font-weight: bold;">機台：</label>
+                <input id="filterMachine" class="easyui-combobox" style="width:180px"
+                       data-options="
+                         valueField:'DeviceID',
+                         textField:'DeviceName',
+                         panelHeight:'300',
+                         prompt:'請選擇機台',
+                         onSelect:onMachineSelect,
+                         onChange:onMachineChange
+                       " />
+            </div>
+            <div style="display:flex; gap:10px">
+                <div style="display: flex; gap: 5px; align-items: center; margin-bottom: 8px;">
+                    <label style="width: 50px; display: inline-block; font-weight: bold;">料號：</label>
+                    <input id="filterProdNo" class="easyui-combobox" style="width:150px"
+                           data-options="
+                         valueField:'ProdNo',
+                         textField:'ProdNo',
+                         panelHeight:'300',
+                         prompt:'請先選擇機台',
+                         disabled:true,
+                         onSelect:onProdNoSelect,
+                         onChange:onProdNoChange
+                       " />
+                </div>
+                <div style="display: flex; gap: 5px; align-items: center; margin-bottom: 8px;">
+                    <label style="width: 50px; display: inline-block; font-weight: bold;">模具：</label>
+                    <input id="filterMoldNo" class="easyui-combobox" style="width:150px"
+                           data-options="
+                         valueField:'MoldNo',
+                         textField:'MoldNo',
+                         panelHeight:'300',
+                         prompt:'請先選擇料號',
+                         disabled:true,
+                         onSelect:onMoldNoSelect
+                       " />
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <div href="javascript:void(0)" class="custom-easyui-button" onclick="applyFilters()">搜尋</div>
+                <div href="javascript:void(0)" class="custom-easyui-button" onclick="clearFilters()">清除</div>
+                <div href="javascript:void(0)" class="custom-easyui-button" onclick="createNewRecipe()">新增</div>
+            </div>
+        </div>
+
+        <!-- Recipe 清單 -->
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+            <table id="recipeGrid" class="easyui-datagrid" style="width:100%; height: 100%;"
+                   data-options="
+                 url:'@Url.Action("GetRecipes", "RecipeManage")',
+                 method:'get',
+                 singleSelect:true,
+                 fitColumns:true,
+                 rownumbers:true,
+                 pagination:true,
+                 panelHeight:500,
+                 pageSize:50,
+                 onSelect:onRecipeSelect,
+                 onLoadSuccess:onRecipeGridLoad,
+                 scrollbarSize:8
+               ">
+                <thead>
+                    <tr>
+                        <th data-options="field:'RecipeId',hidden:true">ID</th>
+                        <th data-options="field:'DeviceName',title:'機台',width:100">機台</th>
+                        <th data-options="field:'ProdNo',title:'料號',width:90">料號</th>
+                        <th data-options="field:'MoldNo',title:'模具',width:60">模具</th>
+                        <th data-options="field:'Version',title:'版次',width:30,align:'center'">版次</th>
+                        <th data-options="field:'IsActive',title:'啟用',width:30,align:'center',formatter:formatActive">啟用</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+
+    <!-- 右側：詳細編輯區 -->
+    <div style="width: 60%; display: flex; flex-direction: column; min-height: 0;">
+        <!-- 空白狀態 -->
+        <div id="emptyState" style="text-align: center; color: #666; padding: 80px 20px; background: #fafafa; border: 1px dashed #ddd; border-radius: 5px; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <h3 style="color: #999; margin-bottom: 10px;">請從左側選擇一個參數配置</h3>
+            <p>選擇現有配置進行查看或編輯<br />或點擊「新增」建立新的參數配置</p>
+        </div>
+
+        <!-- 編輯面板 -->
+        <div id="editPanel" style="display: none; height: 100%; flex-direction: column;">
+            <!-- 基本資訊顯示區 -->
+            <div style="background: #f0f0f0; padding: 15px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; flex-shrink: 0;">
+                <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: baseline; gap: 5px;">
+                        <label style="font-weight: bold; color: #333;">機台：</label>
+                        <span id="displayDeviceName" style="font-weight: bold;">-</span>
+                    </div>
+                    <div style="display: flex; align-items: baseline; gap: 5px;">
+                        <label style="font-weight: bold; color: #333;">料號：</label>
+                        <span id="displayProdNo" style="font-weight: bold; ">-</span>
+                    </div>
+                    <div style="display: flex; align-items: baseline; gap: 5px;">
+                        <label style="font-weight: bold; color: #333;">模具：</label>
+                        <span id="displayMoldNo" style="font-weight: bold; ">-</span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: baseline; gap: 5px;">
+                        <label style="font-weight: bold; color: #333;">版本：</label>
+                        <span id="displayVersion" style="font-weight: bold;">v1</span>
+                    </div>
+                    <div style="display: flex; align-items: baseline; gap: 5px; flex: 1;">
+                        <label style="font-weight: bold; color: #333;">備註：</label>
+                        <input id="editRemark" class="easyui-textbox" style="width:250px;"
+                               data-options="prompt:'輸入備註資訊...'" />
+                    </div>
+                </div>
+                <div style="display: flex; gap: 20px; align-items: baseline; ">
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <span id="versionUpdateInfo" style="color: #888; font-size: 12px;">
+                            <i class="fa fa-clock-o"></i> 最後更新：載入中...
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 參數編輯表格 -->
+            <div style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                <div style="flex: 1; min-height: 0;">
+                    <table id="paramGrid" class="easyui-datagrid"
+                           style="width: 100%; height: 100%;"
+                           data-options="
+                             singleSelect:true,
+                             fitColumns:true,
+                             nowrap:false,
+                             autoRowHeight:true,
+                             onClickCell:onParamCellClick,
+                             onEndEdit:onParamEndEdit,
+                             scrollbarSize:8
+                           ">
+                        <thead>
+                            <tr>
+                                <th data-options="field:'ParamName',title:'參數名稱',width:120">參數名稱</th>
+                                <th data-options="field:'StdValue',title:'標準值',width:80,align:'center',editor:{type:'textbox'}">標準值</th>
+                                <th data-options="field:'MaxValue',title:'上限值',width:80,align:'center',editor:{type:'textbox'}">上限值</th>
+                                <th data-options="field:'MinValue',title:'下限值',width:80,align:'center',editor:{type:'textbox'}">下限值</th>
+                                <th data-options="field:'BiasMethod',title:'偏差方式',width:90,align:'center',formatter:formatBiasMethod,editor:{type:'combobox',options:{valueField:'value',textField:'text',panelHeight:'auto'}}">偏差方式</th>
+                                <th data-options="field:'BiasValue',title:'偏差值',width:70,align:'center',editor:{type:'numberbox',options:{precision:2}}">偏差值</th>
+                                <th data-options="field:'AlarmFlag',title:'警報',width:50,align:'center',formatter:formatAlarmFlag,editor:{type:'checkbox',options:{on:'Y',off:'N'}}">警報</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 操作按鈕區 -->
+            <div style="text-align: right; margin-top: 15px; padding-top: 10px; border-top: 1px solid #ddd; display:flex">
+                <div href="javascript:void(0)" class="custom-easyui-button" onclick="saveRecipe('save')" id="saveBtn">
+                    儲存修改
+                </div>
+                <div href="javascript:void(0)" class="custom-easyui-button secondary" onclick="saveRecipe('newVersion')" id="newVersionBtn">
+                    另存新版本
+                </div>
+                <div href="javascript:void(0)" class="custom-easyui-button danger" onclick="deleteCurrentRecipe()" id="deleteBtn">
+                    刪除此版本
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/Scripts/base/easyui/jquery.easyui.min.js"></script>
+    <script>
+        // 全域變數
+        let currentRecipeId = 0;
+        let allVersions = [];
+        let currentVersionIndex = 0;
+        let editingCell = null;
+        let machineList = [];
+        let currentDeviceId = '';
+        let currentProdNo = '';
+        let currentMoldNo = '';
+
+        // 偏差方式選項
+        const biasMethodOptions = [
+            { value: 'customize', text: '自定義' },
+            { value: 'plusminus', text: '正負加減值' },
+            { value: 'percent', text: '正負百分比' }
+        ];
+
+        $(function() {
+            initializePage();
+        });
+
+        function initializePage() {
+            loadMachineList();
+            loadInitialRecipeList();
+        }
+
+        // 載入機台清單
+        function loadMachineList() {
+            $.get('@Url.Action("GetMachineList", "MachineManage")', function(res) {
+                if (res.success) {
+                    machineList = res.data;
+                    $('#filterMachine').combobox('loadData', machineList);
+                }
+            });
+        }
+
+        // 載入初始Recipe清單（全部）
+        function loadInitialRecipeList() {
+            $('#recipeGrid').datagrid('load', {});
+        }
+
+        // 機台選擇事件
+        function onMachineSelect(record) {
+            currentDeviceId = record.DeviceID;
+
+            // 載入該機台的料號清單
+            $.get('@Url.Action("GetProdNosByDevice", "RecipeManage")', { deviceId: currentDeviceId }, function(res) {
+                if (res.success) {
+                    const prodNos = res.data.map(p => ({ ProdNo: p }));
+                    $('#filterProdNo').combobox('loadData', prodNos)
+                                     .combobox('enable')
+                                     .combobox('clear');
+                    $('#filterMoldNo').combobox('clear').combobox('disable');
+                }
+            });
+        }
+
+        function onMachineChange(newVal, oldVal) {
+            if (!newVal) {
+                $('#filterProdNo').combobox('clear').combobox('disable');
+                $('#filterMoldNo').combobox('clear').combobox('disable');
+                currentDeviceId = '';
+            }
+        }
+
+        // 料號選擇事件
+        function onProdNoSelect(record) {
+            currentProdNo = record.ProdNo;
+
+            // 載入該機台+料號的模具清單
+            $.get('@Url.Action("GetMoldNosByDeviceAndProd", "RecipeManage")', {
+                deviceId: currentDeviceId,
+                prodNo: currentProdNo
+            }, function(res) {
+                if (res.success && res.data.length > 0) {
+                    const moldNos = res.data.map(m => ({ MoldNo: m }));
+                    $('#filterMoldNo').combobox('loadData', moldNos)
+                                     .combobox('enable')
+                                     .combobox('clear');
+                } else {
+                    $('#filterMoldNo').combobox('loadData', [])
+                                     .combobox('disable');
+                }
+            });
+        }
+
+        function onProdNoChange(newVal, oldVal) {
+            if (!newVal) {
+                $('#filterMoldNo').combobox('clear').combobox('disable');
+                currentProdNo = '';
+            }
+        }
+
+        // 模具選擇事件
+        function onMoldNoSelect(record) {
+            currentMoldNo = record.MoldNo;
+        }
+
+        // 應用過濾器
+        function applyFilters() {
+            const filters = {
+                deviceName: $('#filterMachine').combobox('getText'),
+                prodNo: $('#filterProdNo').combobox('getValue'),
+                moldNo: $('#filterMoldNo').combobox('getValue')
+            };
+
+            $('#recipeGrid').datagrid('load', filters);
+        }
+
+        // 清除過濾器
+        function clearFilters() {
+            $('#filterMachine').combobox('clear');
+            $('#filterProdNo').combobox('clear').combobox('disable');
+            $('#filterMoldNo').combobox('clear').combobox('disable');
+            currentDeviceId = '';
+            currentProdNo = '';
+            currentMoldNo = '';
+            $('#recipeGrid').datagrid('load', {});
+        }
+
+        // Recipe清單載入完成
+        function onRecipeGridLoad(data) {
+            // 可以在這裡做一些載入後的處理
+        }
+
+        // 選擇Recipe事件
+        function onRecipeSelect(index, row) {
+            loadRecipeVersions(row.DeviceId, row.ProdNo, row.MaterialNo || '', row.MoldNo || '');
+        }
+
+        // 載入Recipe版本資料
+        function loadRecipeVersions(deviceId, prodNo, materialNo, moldNo) {
+            $.get('@Url.Action("GetDetailToEdit", "RecipeManage")', {
+                deviceId: deviceId,
+                prodNo: prodNo,
+                materialNo: materialNo,
+                moldNo: moldNo
+            }, function(res) {
+                if (res.success && res.data.length > 0) {
+                    allVersions = res.data;
+                    currentVersionIndex = 0;
+                    currentRecipeId = allVersions[0].RecipeId;
+
+                    showEditPanel();
+                    loadVersionDetail(0);
+                } else {
+                    hideEditPanel();
+                }
+            });
+        }
+
+        // 顯示編輯面板
+        function showEditPanel() {
+            $('#emptyState').hide();
+            $('#editPanel').css('display', 'flex');
+        }
+
+        // 隱藏編輯面板
+        function hideEditPanel() {
+            $('#editPanel').hide();
+            $('#emptyState').show();
+        }
+
+        // 載入版本詳細資料
+        function loadVersionDetail(index) {
+            const version = allVersions[index];
+
+            // 更新基本資訊顯示
+            const machine = machineList.find(m => m.DeviceID === version.DeviceId);
+            $('#displayDeviceName').text(machine ? machine.DeviceName : version.DeviceId);
+            $('#displayProdNo').text(version.ProdNo || '-');
+            $('#displayMoldNo').text(version.MoldNo || '-');
+            $('#displayVersion').text(`v${version.Version}`);
+            $('#editRemark').textbox('setValue', version.Remark || '');
+
+            // 更新者資訊
+            const updateBy = version.UpdateBy || version.CreateBy || '-';
+            const updateDate = formatDateTime(version.UpdateDate || version.CreateDate);
+            $('#versionUpdateInfo').html(`<i class="fa fa-clock-o"></i> 最後更新：${updateBy} ${updateDate}`);
+
+            // 載入參數資料
+            const paramData = (version.Params || []).map(p => ({
+                ParamId: p.ParamId,
+                ParamName: p.ParamName,
+                StdValue: p.StdValue || '',
+                MaxValue: p.MaxValue || '',
+                MinValue: p.MinValue || '',
+                BiasMethod: p.BiasMethod || 'customize',
+                BiasValue: p.BiasValue || '',
+                AlarmFlag: p.AlarmFlag || 'Y'
+            }));
+
+            $('#paramGrid').datagrid('loadData', paramData);
+
+            // 重新調整表格大小
+            setTimeout(function() {
+                $('#paramGrid').datagrid('resize');
+            }, 100);
+        }
+
+        // 參數表格單元格點擊
+        function onParamCellClick(index, field) {
+            endCurrentEdit();
+
+            if (['StdValue', 'MaxValue', 'MinValue', 'BiasMethod', 'BiasValue', 'AlarmFlag'].includes(field)) {
+                $('#paramGrid').datagrid('beginEdit', index);
+
+                // 設定偏差方式的選項
+                if (field === 'BiasMethod') {
+                    const editor = $('#paramGrid').datagrid('getEditor', { index: index, field: field });
+                    if (editor) {
+                        $(editor.target).combobox('loadData', biasMethodOptions);
+                    }
+                }
+
+                editingCell = { index: index, field: field };
+            }
+        }
+
+        // 參數編輯結束
+        function onParamEndEdit(index, row, changes) {
+            // 自動計算偏差值
+            if ('BiasValue' in changes || 'BiasMethod' in changes || 'StdValue' in changes) {
+                calculateBiasValues(index, row);
+            }
+        }
+
+        // 結束當前編輯
+        function endCurrentEdit() {
+            if (editingCell) {
+                $('#paramGrid').datagrid('endEdit', editingCell.index);
+                editingCell = null;
+            }
+        }
+
+        // 計算偏差值
+        function calculateBiasValues(index, row) {
+            const std = parseFloat(row.StdValue) || 0;
+            const bias = parseFloat(row.BiasValue) || 0;
+            let max = std, min = std;
+
+            if (row.BiasMethod === 'plusminus') {
+                max = std + bias;
+                min = std - bias;
+            } else if (row.BiasMethod === 'percent') {
+                max = std * (1 + bias / 100);
+                min = std * (1 - bias / 100);
+            }
+
+            if (row.BiasMethod !== 'customize') {
+                $('#paramGrid').datagrid('updateRow', {
+                    index: index,
+                    row: {
+                        MaxValue: max.toFixed(2),
+                        MinValue: min.toFixed(2)
+                    }
+                });
+            }
+        }
+
+        // 新增Recipe
+        function createNewRecipe() {
+            // 檢查是否已選擇機台
+            if (!currentDeviceId) {
+                $.messager.alert('提示', '請先選擇機台');
+                return;
+            }
+
+            // 跳轉到編輯頁面，並帶上預設參數
+            const editUrl = '@Url.Action("Edit", "RecipeManage")' +
+                           '?deviceId=' + encodeURIComponent(currentDeviceId) +
+                           (currentProdNo ? '&prodNo=' + encodeURIComponent(currentProdNo) : '') +
+                           (currentMoldNo ? '&moldNo=' + encodeURIComponent(currentMoldNo) : '');
+
+            window.location.href = editUrl;
+        }
+
+        // 儲存Recipe
+        function saveRecipe(mode) {
+            endCurrentEdit();
+
+            const paramRows = $('#paramGrid').datagrid('getRows');
+            const currentVersion = allVersions[currentVersionIndex];
+
+            const dto = {
+                Mode: mode,
+                RecipeId: currentRecipeId,
+                ProdNo: currentVersion.ProdNo,
+                MaterialNo: currentVersion.MaterialNo,
+                MoldNo: currentVersion.MoldNo,
+                DeviceId: currentVersion.DeviceId,
+                Remark: $('#editRemark').textbox('getValue'),
+                RecipeDetails: paramRows
+            };
+
+            $.ajax({
+                url: '@Url.Action("SaveRecipe", "RecipeManage")',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(dto),
+                success: function(res) {
+                    if (res.success) {
+                        $.messager.show({
+                            title: '成功',
+                            msg: '儲存完成！',
+                            timeout: 2000,
+                            showType: 'slide'
+                        });
+
+                        // 重新載入
+                        loadRecipeVersions(currentVersion.DeviceId, currentVersion.ProdNo,
+                                         currentVersion.MaterialNo, currentVersion.MoldNo);
+                        applyFilters();
+                    } else {
+                        $.messager.alert('錯誤', res.message || '儲存失敗');
+                    }
+                },
+                error: function() {
+                    $.messager.alert('錯誤', '儲存時發生錯誤');
+                }
+            });
+        }
+
+        // 刪除當前Recipe
+        function deleteCurrentRecipe() {
+            if (currentRecipeId <= 0) return;
+
+            $.messager.confirm('確認', '確定要刪除此版本嗎？此操作無法復原！', function(r) {
+                if (r) {
+                    $.ajax({
+                        url: '@Url.Action("DeleteRecipe", "RecipeManage")',
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({ recipeId: currentRecipeId }),
+                        success: function(res) {
+                            if (res.success) {
+                                $.messager.show({
+                                    title: '成功',
+                                    msg: '刪除完成！',
+                                    timeout: 2000,
+                                    showType: 'slide'
+                                });
+
+                                // 隱藏編輯面板並重新載入清單
+                                hideEditPanel();
+                                applyFilters();
+                            } else {
+                                $.messager.alert('錯誤', res.message || '刪除失敗');
+                            }
+                        },
+                        error: function() {
+                            $.messager.alert('錯誤', '刪除時發生錯誤');
+                        }
+                    });
+                }
+            });
+        }
+
+        // 格式化函數
+        function formatActive(value) {
+            return value ? '<i class="fa fa-check" style="color:green;"></i>' : '<i class="fa fa-times" style="color:red;"></i>';
+        }
+
+        function formatDateTime(value) {
+            if (!value) return '-';
+            const matches = /\/Date\((\d+)\)\//.exec(value);
+            if (!matches) return value;
+            const date = new Date(parseInt(matches[1]));
+            return date.toLocaleString();
+        }
+
+        function formatBiasMethod(value) {
+            const option = biasMethodOptions.find(o => o.value === value);
+            return option ? option.text : value;
+        }
+
+        function formatAlarmFlag(value) {
+            return value === 'Y' ? '<i class="fa fa-check" style="color:green;"></i>' : '<i class="fa fa-times" style="color:red;"></i>';
+        }
+    </script>
+}

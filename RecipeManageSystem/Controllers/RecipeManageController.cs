@@ -17,13 +17,7 @@ namespace RecipeManageSystem.Controllers
         private readonly RecipeManageRepository _recipeManage = new RecipeManageRepository();
 
         [PermissionAuthorize]
-        public ActionResult Edit()
-        {
-            return View();
-        }
-
-        [PermissionAuthorize]
-        public ActionResult List()
+        public ActionResult Index()
         {
             return View();  
         }
@@ -44,22 +38,23 @@ namespace RecipeManageSystem.Controllers
                     v.MaterialNo,
                     v.ProdNo,
                     v.Version,
-                    v.Remark,        
+                    v.Remark,    
+                    v.IsActive,
                     v.CreateBy,
                     v.CreateDate,
                     v.UpdateBy,
                     v.UpdateDate,
-                    Params = v.Params // 這版本的參數明細
+                    v.Params
                 })
             }, JsonRequestBehavior.AllowGet);
         }
 
 
         [HttpGet]
-        public JsonResult GetRecipes(string prodNo, string deviceName, int page = 1, int rows = 50)
+        public JsonResult GetRecipes(string prodNo, string deviceName, string moldNo, int page = 1, int rows = 50)
         {
             // 1. 從 Repository 抓所有或條件後的列表
-            var all = _recipeManage.GetRecipes(prodNo, deviceName);
+            var all = _recipeManage.GetRecipes(prodNo, deviceName, moldNo);
 
             // 2. 分頁
             var paged = all.Skip((page - 1) * rows).Take(rows).ToList();
@@ -70,6 +65,7 @@ namespace RecipeManageSystem.Controllers
                 rows = paged
             }, JsonRequestBehavior.AllowGet);
         }
+
 
 
         [HttpGet]
@@ -84,6 +80,81 @@ namespace RecipeManageSystem.Controllers
             }, JsonRequestBehavior.AllowGet);
         }
 
+
+        /// <summary>
+        /// 根據機台ID取得該機台所有的料號清單
+        /// </summary>
+        [HttpGet]
+        public JsonResult GetProdNosByDevice(string deviceId)
+        {
+            try
+            {
+                var prodNos = _recipeManage.GetProdNosByDevice(deviceId);
+                return Json(new
+                {
+                    success = true,
+                    data = prodNos
+                }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "取得料號清單失敗：" + ex.Message
+                }, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        /// <summary>
+        /// 根據機台ID和料號取得模具清單
+        /// </summary>
+        [HttpGet]
+        public JsonResult GetMoldNosByDeviceAndProd(string deviceId, string prodNo)
+        {
+            try
+            {
+                var moldNos = _recipeManage.GetMoldNosByDeviceAndProd(deviceId, prodNo);
+                return Json(new
+                {
+                    success = true,
+                    data = moldNos
+                }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "取得模具清單失敗：" + ex.Message
+                }, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        /// <summary>
+        /// 根據機台ID和料號取得原料清單
+        /// </summary>
+        [HttpGet]
+        public JsonResult GetMaterialNosByDeviceAndProd(string deviceId, string prodNo)
+        {
+            try
+            {
+                var materialNos = _recipeManage.GetMaterialNosByDeviceAndProd(deviceId, prodNo);
+                return Json(new
+                {
+                    success = true,
+                    data = materialNos
+                }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "取得原料清單失敗：" + ex.Message
+                }, JsonRequestBehavior.AllowGet);
+            }
+        }
 
         [HttpPost]
         [ValidateInput(false)] // 避免 MVC 自動擋掉包含 HTML 的內容
@@ -104,6 +175,34 @@ namespace RecipeManageSystem.Controllers
             var ok = _recipeManage.SaveRecipe(dto, dto.Mode, userName);
 
             return Json(new { success = ok });
+        }
+
+        /// <summary>
+        /// 刪除指定的Recipe版本
+        /// </summary>
+        [HttpPost]
+        [PermissionAuthorize(4)] // 假設權限ID 4 是刪除權限
+        public JsonResult DeleteRecipe(int recipeId)
+        {
+            try
+            {
+                var userName = User?.Identity?.Name ?? "Unknown";
+                var success = _recipeManage.DeleteRecipe(recipeId, userName);
+
+                return Json(new
+                {
+                    success = success,
+                    message = success ? "刪除成功" : "刪除失敗"
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "刪除時發生錯誤：" + ex.Message
+                });
+            }
         }
 
     }

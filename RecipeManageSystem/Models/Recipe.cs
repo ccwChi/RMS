@@ -19,6 +19,7 @@ namespace RecipeManageSystem.Models
         public string AlarmFlag { get; set; }
         public int Version { get; set; }
         public bool IsActive { get; set; }
+
         public string CreateBy { get; set; }
         public DateTime CreateDate { get; set; }
         public string UpdateBy { get; set; }
@@ -111,5 +112,6 @@ namespace RecipeManageSystem.Models
         public string MinValue { get; set; }
         public string BiasMethod { get; set; }
         public string BiasValue { get; set; }
+        public string AlarmFlag { get; set; }
     }
 }

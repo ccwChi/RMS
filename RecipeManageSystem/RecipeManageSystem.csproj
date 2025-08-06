@@ -807,8 +807,7 @@
     <Content Include="Views\Param\Index.cshtml" />
     <Content Include="Views\MachineParam\Index.cshtml" />
     <Content Include="Views\RecipeManage\Edit.cshtml" />
-    <Content Include="Views\RecipeManage\List.cshtml" />
-    <Content Include="Views\RecipeManage\GetRecipeDetails.cshtml" />
+    <Content Include="Views\RecipeManage\Index.cshtml" />
     <Content Include="Views\AlarmManage\Index.cshtml" />
   </ItemGroup>
   <ItemGroup>

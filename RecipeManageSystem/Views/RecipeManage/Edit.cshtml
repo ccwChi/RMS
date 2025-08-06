@@ -1,4 +1,4 @@
-﻿@{
+﻿<!--@{
     ViewBag.Title = "配方建立／修改";
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
@@ -15,21 +15,21 @@
         <label for="recipeMachine" style="width:60px;display:inline-block;margin-left:20px">機台：</label>
         <input name="recipeMachine" id="recipeMachine" class="easyui-combobox" style="width:120px" />
 
-        <label for="recipeMachine" style="width:60px;display:inline-block;margin-left:20px">料號：</label>
+        <label for="recipeMachine" style="width:60px;display:inline-block;margin-left:20px">料號：</label>-->
         @*<input id="prodNo" class="easyui-combobox" style="width:120px" />*@
-        <input id="prodNo" class="easyui-textbox" style="width:120px" />
-        <label style="width:60px;display:inline-block;margin-left:20px">模具：</label>
+        <!--<input id="prodNo" class="easyui-textbox" style="width:120px" />
+        <label style="width:60px;display:inline-block;margin-left:20px">模具：</label>-->
         @*<input id="moldNo" class="easyui-combobox" style="width:120px" />*@
-        <input id="moldNo" class="easyui-textbox" style="width:120px" />
-        <label style="width:60px;display:inline-block;margin-left:20px">原料：</label>
+        <!--<input id="moldNo" class="easyui-textbox" style="width:120px" />
+        <label style="width:60px;display:inline-block;margin-left:20px">原料：</label>-->
         @*<input id="materialNo" class="easyui-combobox" style="width:120px" />*@
-        <input id="materialNo" class="easyui-textbox" style="width:120px" />
+        <!--<input id="materialNo" class="easyui-textbox" style="width:120px" />
         <div href="javascript:void(0)" class="custom-easyui-button" onclick="startBuild()">搜尋</div>
 
     </div>
-    <div style="display:flex">
+    <div style="display:flex">-->
         <!-- 新增版本下拉與註解顯示 -->
-        <label style="width:60px;display:inline-block;margin-left:20px">版本：</label>
+        <!--<label style="width:60px;display:inline-block;margin-left:20px">版本：</label>
         <input id="versionNo" class="easyui-combobox" style="width:120px"
                data-options="
                  valueField:'RecipeId',
@@ -37,14 +37,14 @@
                  editable:false,
                  panelHeight:'auto',
                  onSelect: onVersionSelect
-               " />
+               " />-->
         <!-- 在「版本下拉」旁，改成一個易於編輯的 textbox -->
-        <label style="width:60px;display:inline-block;margin-left:20px">備註：</label>
+        <!--<label style="width:60px;display:inline-block;margin-left:20px">備註：</label>
         <input id="versionRemark" class="easyui-textbox" style="width:300px;"
-               data-options="multiline:true,panelHeight:'auto'" />
+               data-options="multiline:true,panelHeight:'auto'" />-->
 
         <!-- 如果你還想顯示「更新者 / 更新時間」-->
-        <span id="versionInfo" style="margin-left:10px;color:#555"></span>
+        <!--<span id="versionInfo" style="margin-left:10px;color:#555"></span>
     </div>
 </div>
 
@@ -412,4 +412,4 @@
 
     </script>
 
-}
+}-->

@@ -135,17 +135,6 @@
                 </div>
             </div>
 
-            <!-- 版本切換區 -->
-            <!--<div style="margin-bottom: 10px; flex-shrink: 0;">
-                <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                    <div style="font-weight: bold; color: #333;">版本歷史</div>
-                    <span id="versionCount" style="color: #666; font-size: 12px; margin-left: 10px;">共 0 個版本</span>
-                </div>
-                <div id="versionTabs" style="display: flex; gap: 2px; margin-bottom: 10px;">-->
-                    <!-- 動態生成版本標籤 -->
-                <!--</div>
-            </div>-->
-
             <!-- 參數編輯表格 -->
             <div style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
                 <!-- 參數表格容器 - 重要：這裡設定固定高度和滾動 -->
@@ -159,7 +148,7 @@
                              autoRowHeight:true,
                              onClickCell:onParamCellClick,
                              onEndEdit:onParamEndEdit,
-                             scrollbarSize:8
+                             scrollbarSize:4
                            ">
                         <thead>
                             <tr>
@@ -178,7 +167,7 @@
 
 
             <!-- 操作按鈕區 -->
-            <div style="text-align: right; margin-top: 15px; padding-top: 10px; border-top: 1px solid #ddd; display:flex">
+            <div style="justify-content:end; margin-top: 5px; display:flex; width:100%">
                 <div href="javascript:void(0)" class="custom-easyui-button" onclick="saveRecipe('save')" id="saveBtn">
                     儲存修改
                 </div>
@@ -215,9 +204,6 @@
 
         $(function() {
             initializePage();
-
-            // 重要：確保編輯面板顯示時使用 flex 佈局
-            //$('#editPanel').css('display', 'flex');
         });
 
         function initializePage() {
@@ -242,6 +228,7 @@
 
         // 機台選擇事件
         function onMachineSelect(record) {
+
             currentDeviceId = record.DeviceID;
 
             // 載入該機台的料號清單
@@ -322,6 +309,24 @@
         // Recipe清單載入完成
         function onRecipeGridLoad(data) {
             // 可以在這裡做一些載入後的處理
+            customizePagination();
+        }
+
+        function customizePagination() {
+            var pager = $('#recipeGrid').datagrid('getPager');
+            if (pager.length) {
+                // 隱藏頁數輸入相關元素
+                pager.find('.pagination-num').closest('td').hide(); // 隱藏輸入框
+                pager.find('td:contains("Page")').hide(); // 隱藏 "Page" 文字
+                pager.find('td:contains("of")').hide(); // 隱藏 "of X" 文字
+
+                // 也可以隱藏首頁和末頁按鈕（可選）
+                pager.find('.pagination-first').closest('td').hide();
+                pager.find('.pagination-last').closest('td').hide();
+
+                // 隱藏多餘的分隔線
+                pager.find('.pagination-btn-separator').hide();
+            }
         }
 
         // 選擇Recipe事件
@@ -336,14 +341,15 @@
                 prodNo: prodNo,
                 materialNo: materialNo,
                 moldNo: moldNo
-            }, function(res) {
+            }, function (res) {
+                console.log("loadRecipeVersions; GetDetailToEdit;", res)
                 if (res.success && res.data.length > 0) {
                     allVersions = res.data;
                     currentVersionIndex = 0;
                     currentRecipeId = allVersions[0].RecipeId;
 
                     showEditPanel();
-                    renderVersionTabs();
+                    //renderVersionTabs();
                     loadVersionDetail(0);
                 } else {
                     hideEditPanel();
@@ -365,38 +371,40 @@
 
         // 渲染版本標籤
         function renderVersionTabs() {
-            const tabsHtml = allVersions.map((version, index) =>
-                `<a href="javascript:void(0)" onclick="switchVersion(${index})"
-                   style="padding: 6px 12px; background: ${index === currentVersionIndex ? '#e6f3ff' : '#f0f0f0'}; border: 1px solid #ccc; cursor: pointer; text-decoration: none; color: #333; border-radius: 3px 3px 0 0; font-weight: ${index === currentVersionIndex ? 'bold' : 'normal'};">
-                   版本 ${version.Version}
-                 </a>`
-            ).join('');
+            alert("該功能取消")
+            //const tabsHtml = allVersions.map((version, index) =>
+            //    `<a href="javascript:void(0)" onclick="switchVersion(${index})"
+            //       style="padding: 6px 12px; background: ${index === currentVersionIndex ? '#e6f3ff' : '#f0f0f0'}; border: 1px solid #ccc; cursor: pointer; text-decoration: none; color: #333; border-radius: 3px 3px 0 0; font-weight: ${index === currentVersionIndex ? 'bold' : 'normal'};">
+            //       版本 ${version.Version}
+            //     </a>`
+            //).join('');
 
-            $('#versionTabs').html(tabsHtml);
-            $('#versionCount').text(`共 ${allVersions.length} 個版本`);
+            //$('#versionTabs').html(tabsHtml);
+            //$('#versionCount').text(`共 ${allVersions.length} 個版本`);
         }
 
         // 切換版本
         function switchVersion(index) {
-            if (currentVersionIndex !== index) {
-                endCurrentEdit();
-                currentVersionIndex = index;
-                currentRecipeId = allVersions[index].RecipeId;
-                loadVersionDetail(index);
-                renderVersionTabs();
-            }
+            alert("該功能取消")
+            //if (currentVersionIndex !== index) {
+            //    endCurrentEdit();
+            //    currentVersionIndex = index;
+            //    currentRecipeId = allVersions[index].RecipeId;
+            //    loadVersionDetail(index);
+            //    renderVersionTabs();
+            //}
         }
 
         // 載入版本詳細資料
+        // 在 loadVersionDetail 函數中加入這段邏輯
         function loadVersionDetail(index) {
             const version = allVersions[index];
-
+            console.log({ allVersions })
             // 更新基本資訊顯示
             const machine = machineList.find(m => m.DeviceID === version.DeviceId);
             $('#displayDeviceName').text(machine ? machine.DeviceName : version.DeviceId);
             $('#displayProdNo').text(version.ProdNo || '-');
             $('#displayMoldNo').text(version.MoldNo || '-');
-            $('#displayMaterialNo').text(version.MaterialNo || '-');
             $('#displayVersion').text(`v${version.Version}`);
             $('#editRemark').textbox('setValue', version.Remark || '');
 
@@ -405,7 +413,7 @@
             const updateDate = formatDateTime(version.UpdateDate || version.CreateDate);
             $('#versionUpdateInfo').html(`<i class="fa fa-clock-o"></i> 最後更新：${updateBy} ${updateDate}`);
 
-            // 載入參數資料
+            // 載入參數資料，並標記哪些是新參數
             const paramData = (version.Params || []).map(p => ({
                 ParamId: p.ParamId,
                 ParamName: p.ParamName,
@@ -414,16 +422,137 @@
                 MinValue: p.MinValue || '',
                 BiasMethod: p.BiasMethod || 'customize',
                 BiasValue: p.BiasValue || '',
-                AlarmFlag: p.AlarmFlag || 'Y'
+                AlarmFlag: p.AlarmFlag || 'Y',
+                // 標記是否為新參數（沒有填入 StdValue）
+                _isNewParam: !p.StdValue || p.StdValue.trim() === ''
             }));
 
             $('#paramGrid').datagrid('loadData', paramData);
-            $('#paramCount').text(`共 ${paramData.length} 個參數`);
 
-            // 重要：重新調整表格大小以確保正確顯示
+            // 重新調整表格大小
             setTimeout(function() {
                 $('#paramGrid').datagrid('resize');
+
+                // 為新參數添加視覺提示
+                highlightNewParams();
             }, 100);
+        }
+
+        // 高亮顯示新參數
+        function highlightNewParams() {
+            const rows = $('#paramGrid').datagrid('getRows');
+            rows.forEach((row, index) => {
+                if (row._isNewParam) {
+                    // 為新參數行添加背景色
+                    $('#paramGrid').datagrid('getPanel').find(`tr[datagrid-row-index="${index}"]`)
+                        .css('background-color', '#fff3cd')
+                        .attr('title', '此參數尚未設定數值，可以填入後儲存');
+                }
+            });
+        }
+        // 在參數名稱的格式化函數中也可以加入提示
+        function formatParamName(value, row, index) {
+            if (row._isNewParam) {
+                return `<span style="color: #856404;">${value} <i class="fa fa-plus-circle" title="新增參數"></i></span>`;
+            }
+            return value;
+        }
+
+        // 更新 DataGrid 的 columns 配置
+        const paramGridColumns = [[
+            {
+                field: 'ParamName',
+                title: '參數名稱',
+                width: 120,
+                formatter: formatParamName
+            },
+            { field: 'StdValue', title: '標準值', width: 80, align: 'center', editor: { type: 'textbox' } },
+            { field: 'MaxValue', title: '上限值', width: 80, align: 'center', editor: { type: 'textbox' } },
+            { field: 'MinValue', title: '下限值', width: 80, align: 'center', editor: { type: 'textbox' } },
+            {
+                field: 'BiasMethod',
+                title: '偏差方式',
+                width: 90,
+                align: 'center',
+                formatter: formatBiasMethod,
+                editor: {
+                    type: 'combobox',
+                    options: {
+                        valueField: 'value',
+                        textField: 'text',
+                        panelHeight: 'auto'
+                    }
+                }
+            },
+            { field: 'BiasValue', title: '偏差值', width: 70, align: 'center', editor: { type: 'numberbox', options: { precision: 2 } } },
+            {
+                field: 'AlarmFlag',
+                title: '警報',
+                width: 50,
+                align: 'center',
+                formatter: formatAlarmFlag,
+                editor: {
+                    type: 'checkbox',
+                    options: { on: 'Y', off: 'N' }
+                }
+            }
+        ]];
+
+        // 在儲存前過濾掉空值參數的邏輯
+        function saveRecipe(mode) {
+            endCurrentEdit();
+
+            const allParamRows = $('#paramGrid').datagrid('getRows');
+
+            // 只儲存有填入 StdValue 的參數
+            const paramRows = allParamRows.filter(row =>
+                row.StdValue && row.StdValue.toString().trim() !== ''
+            );
+
+            if (paramRows.length === 0) {
+                $.messager.alert('提示', '請至少填入一個參數的標準值');
+                return;
+            }
+
+            const currentVersion = allVersions[currentVersionIndex];
+
+            const dto = {
+                Mode: mode,
+                RecipeId: currentRecipeId,
+                ProdNo: currentVersion.ProdNo,
+                MaterialNo: currentVersion.MaterialNo,
+                MoldNo: currentVersion.MoldNo,
+                DeviceId: currentVersion.DeviceId,
+                Remark: $('#editRemark').textbox('getValue'),
+                RecipeDetails: paramRows
+            };
+
+            $.ajax({
+                url: '@Url.Action("SaveRecipe", "RecipeManage")',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(dto),
+                success: function(res) {
+                    if (res.success) {
+                        $.messager.show({
+                            title: '成功',
+                            msg: `儲存完成！已儲存 ${paramRows.length} 個參數`,
+                            timeout: 3000,
+                            showType: 'slide'
+                        });
+
+                        // 重新載入
+                        loadRecipeVersions(currentVersion.DeviceId, currentVersion.ProdNo,
+                                         currentVersion.MaterialNo, currentVersion.MoldNo);
+                        applyFilters();
+                    } else {
+                        $.messager.alert('錯誤', res.message || '儲存失敗');
+                    }
+                },
+                error: function() {
+                    $.messager.alert('錯誤', '儲存時發生錯誤');
+                }
+            });
         }
 
         // 參數表格單元格點擊

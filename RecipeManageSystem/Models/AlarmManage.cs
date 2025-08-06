@@ -82,8 +82,8 @@ namespace RecipeManageSystem.Models
         public int MachineGroupId { get; set; }
         public string GroupName { get; set; }
         public string Description { get; set; }
-        public string DeviceList { get; set; }  // 機台清單 (逗號分隔)
-        public int DeviceCount { get; set; }    // 機台數量
+        public string DeviceList { get; set; }  
+        public int DeviceCount { get; set; }    
     }
 }
 

@@ -1,7 +1,7 @@
 ﻿using System.Configuration;
 
 
-namespace MeasrueVendor.Repository
+namespace RecipeManageSystem.Repository
 {
     public class BaseRepository
     {

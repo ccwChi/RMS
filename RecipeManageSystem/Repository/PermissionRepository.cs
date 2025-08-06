@@ -4,7 +4,7 @@ using System.Linq;
 using Dapper;
 using RecipeManageSystem.Models;
 using System.Configuration;
-using MeasrueVendor.Repository;
+using RecipeManageSystem.Repository;
 using System;
 
 namespace RecipeManageSystem.Repository

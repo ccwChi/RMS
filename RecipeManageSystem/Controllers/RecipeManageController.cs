@@ -182,7 +182,7 @@ namespace RecipeManageSystem.Controllers
         /// 刪除指定的Recipe版本
         /// </summary>
         [HttpPost]
-        [PermissionAuthorize(4)] // 假設權限ID 4 是刪除權限
+        [PermissionAuthorize(7)] // 假設權限ID 7 是刪除權限
         public JsonResult DeleteRecipe(int recipeId)
         {
             try

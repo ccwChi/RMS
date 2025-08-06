@@ -4,7 +4,7 @@ using System.Data.SqlClient;
 using System.Data;
 using System.Linq;
 using System.Web;
-using MeasrueVendor.Repository;
+using RecipeManageSystem.Repository;
 using RecipeManageSystem.Models;
 using Dapper;
 using System.Configuration;
@@ -361,8 +361,7 @@ namespace RecipeManageSystem.Repository
                     }
 
                     // 只有當 det.ParamId 有值時才加入（避免 LEFT JOIN 產生的空資料）
-                    //if (det != null && det.ParamId > 0)
-                    if (det != null)
+                    if (det != null && det.ParamId > 0)
                     {
                         version.Params.Add(det);
                     }
@@ -407,8 +406,8 @@ namespace RecipeManageSystem.Repository
                                     StdValue = string.Empty,
                                     MaxValue = string.Empty,
                                     MinValue = string.Empty,
-                                    BiasMethod = "customize",
-                                    BiasValue = string.Empty,
+                                    BiasMethod = "percent",
+                                    BiasValue = "10",
                                     AlarmFlag = "N"
                                 });
                             }
@@ -443,8 +442,8 @@ namespace RecipeManageSystem.Repository
                         StdValue = string.Empty,
                         MaxValue = string.Empty,
                         MinValue = string.Empty,
-                        BiasMethod = "customize",
-                        BiasValue = string.Empty,
+                        BiasMethod = "percent",
+                        BiasValue = "10",
                         AlarmFlag = "Y"
                     }).ToList()
                 };

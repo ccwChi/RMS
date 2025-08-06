@@ -4,7 +4,7 @@ using System.Data.SqlClient;
 using System.Data;
 using System.Linq;
 using System.Web;
-using MeasrueVendor.Repository;
+using RecipeManageSystem.Repository;
 using RecipeManageSystem.Models;
 using Dapper;
 

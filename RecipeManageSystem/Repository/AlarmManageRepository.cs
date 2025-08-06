@@ -6,7 +6,7 @@ using System.Drawing;
 using System.Linq;
 using System.Web;
 using Dapper;
-using MeasrueVendor.Repository;
+using RecipeManageSystem.Repository;
 using RecipeManageSystem.Models;
 
 namespace RecipeManageSystem.Repository

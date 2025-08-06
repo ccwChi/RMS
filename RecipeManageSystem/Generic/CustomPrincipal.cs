@@ -11,14 +11,26 @@ namespace RecipeManageSystem.Generic
 {
     public class CustomPrincipal : IPrincipal
     {
-        //private readonly CustomIdentity identity;
         private readonly IPrincipal _systemPrincipal;
+
+        // 採用與 BaseRepository 相同的配置模式
+        private readonly string _rmsConnectionString;
+        private readonly string _envFlag;
 
         public CustomPrincipal(IPrincipal principal)
         {
             if (principal == null) throw new ArgumentNullException("principal");
             _systemPrincipal = principal;
+
+            // 讀取環境設定
+            _envFlag = ConfigurationManager.AppSettings["EnvFlag"];
+
+            // 根據環境變數選擇對應的連線字串
+            _rmsConnectionString = ConfigurationManager.ConnectionStrings[
+                (_envFlag == "1") ? "RMSConnection" : "RMS_DEVConnection"
+            ].ConnectionString;
         }
+
         public IIdentity Identity
         {
             get { return _systemPrincipal.Identity; }
@@ -46,9 +58,7 @@ namespace RecipeManageSystem.Generic
             if (string.IsNullOrEmpty(UserNo))
                 return;
 
-            var connStr = ConfigurationManager.ConnectionStrings["RMSConnection"].ConnectionString;
-
-            using (var conn = new SqlConnection(connStr))
+            using (var conn = new SqlConnection(_rmsConnectionString))
             {
                 const string sql = @"
                     SELECT u.RoleId, r.Permissions
@@ -75,5 +85,13 @@ namespace RecipeManageSystem.Generic
         public bool HasPermission(int permissionId)
             => PermissionIds.Contains(permissionId);
 
+        /// <summary>
+        /// 取得目前使用的連線字串（除錯用）
+        /// </summary>
+        public string GetConnectionInfo()
+        {
+            return $"Environment: {(_envFlag == "1" ? "Production" : "Development")}, " +
+                   $"Connection: {(_envFlag == "1" ? "RMSConnection" : "RMS_DEVConnection")}";
+        }
     }
 }

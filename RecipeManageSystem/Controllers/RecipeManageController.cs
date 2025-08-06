@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.IO;
 using System.Linq;
 using System.Web;
@@ -201,6 +202,61 @@ namespace RecipeManageSystem.Controllers
                 {
                     success = false,
                     message = "刪除時發生錯誤：" + ex.Message
+                });
+            }
+        }
+
+        // 在 RecipeManageController.cs 中新增此方法
+        /// <summary>
+        /// 取得指定機台的參數定義（用於建立新Recipe）
+        /// </summary>
+        [HttpGet]
+        public JsonResult GetMachineParameterDefinitions(string deviceId)
+        {
+            try
+            {
+                var paramDefinitions = _recipeManage.GetMachineParameterDefinitions(deviceId);
+                return Json(new
+                {
+                    success = true,
+                    data = paramDefinitions
+                }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "取得機台參數定義失敗：" + ex.Message
+                }, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        // 在 RecipeManageController.cs 中新增此方法
+        /// <summary>
+        /// 切換Recipe版本的啟用/停用狀態
+        /// </summary>
+        [HttpPost]
+        [PermissionAuthorize(3)] // 使用與儲存相同的權限
+        public JsonResult ToggleRecipeStatus(int recipeId, bool isActive)
+        {
+            try
+            {
+                var userName = User?.Identity?.Name ?? "Unknown";
+                var success = _recipeManage.ToggleRecipeStatus(recipeId, isActive, userName);
+
+                return Json(new
+                {
+                    success = success,
+                    message = success ? (isActive ? "版本已啟用" : "版本已停用") : "狀態切換失敗"
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "狀態切換時發生錯誤：" + ex.Message
                 });
             }
         }

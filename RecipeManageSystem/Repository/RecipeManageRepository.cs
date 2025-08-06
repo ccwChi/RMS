@@ -36,8 +36,25 @@ namespace RecipeManageSystem.Repository
                     }
                     else if (mode == "newVersion")
                     {
-                        // 把舊版停用
-                        conn.Execute("UPDATE RMS.dbo.RecipeHeader SET IsActive = 0 WHERE RecipeId = @recipeId", new { recipeId }, tran);
+                        // 如果要新建版本且設為啟用，需要先將同一組合的其他版本停用
+                        if (dto.IsActive)
+                        {
+                            conn.Execute(@"
+                                    UPDATE RMS.dbo.RecipeHeader 
+                                    SET IsActive = 0 
+                                    WHERE DeviceId = @deviceId 
+                                      AND ProdNo = @prodNo 
+                                      AND ISNULL(MaterialNo, '') = @materialNo 
+                                      AND ISNULL(MoldNo, '') = @moldNo",
+                                new
+                                {
+                                    deviceId = dto.DeviceId,
+                                    prodNo = dto.ProdNo,
+                                    materialNo = dto.MaterialNo ?? "",
+                                    moldNo = dto.MoldNo ?? ""
+                                }, tran);
+                        }
+
                         // 取得舊版最新版次
                         int oldVer = conn.ExecuteScalar<int>("SELECT Version FROM RMS.dbo.RecipeHeader WHERE RecipeId = @recipeId", new { recipeId }, tran);
                         // 插入新一版，版次 +1
@@ -76,12 +93,31 @@ namespace RecipeManageSystem.Repository
         // 插入新 Header 的共用方法
         private int InsertNewHeader(RecipeTotalDto dto, int version, string user, IDbConnection conn, IDbTransaction tran)
         {
+            // 如果新版本設為啟用，需要先將同一組合的其他版本停用
+            if (dto.IsActive)
+            {
+                conn.Execute(@"
+                    UPDATE RMS.dbo.RecipeHeader 
+                    SET IsActive = 0 
+                    WHERE DeviceId = @deviceId 
+                      AND ProdNo = @prodNo 
+                      AND ISNULL(MaterialNo, '') = @materialNo 
+                      AND ISNULL(MoldNo, '') = @moldNo",
+                    new
+                    {
+                        deviceId = dto.DeviceId,
+                        prodNo = dto.ProdNo,
+                        materialNo = dto.MaterialNo ?? "",
+                        moldNo = dto.MoldNo ?? ""
+                    }, tran);
+            }
+
             string sql = @"
-                    INSERT INTO RMS.dbo.RecipeHeader
-                      (ProdNo, DeviceId, MoldNo, MaterialNo, ProdName, Remark, Version, IsActive, CreateBy)
-                    VALUES
-                      (@ProdNo, @DeviceId, @MoldNo, @MaterialNo, @ProdName, @Remark, @Version, 1, @CreateBy);
-                    SELECT CAST(SCOPE_IDENTITY() AS int);";
+                INSERT INTO RMS.dbo.RecipeHeader
+                  (ProdNo, DeviceId, MoldNo, MaterialNo, ProdName, Remark, Version, IsActive, CreateBy)
+                VALUES
+                  (@ProdNo, @DeviceId, @MoldNo, @MaterialNo, @ProdName, @Remark, @Version, @IsActive, @CreateBy);
+                SELECT CAST(SCOPE_IDENTITY() AS int);";
             return conn.ExecuteScalar<int>(sql, new
             {
                 dto.ProdNo,
@@ -91,29 +127,48 @@ namespace RecipeManageSystem.Repository
                 dto.ProdName,
                 dto.Remark,
                 Version = version,
+                IsActive = dto.IsActive,  // 加入 IsActive
                 CreateBy = user
             }, tran);
         }
 
         // 更新 Header（不改版次、不停用）
-        private void UpdateHeader(
-            RecipeTotalDto dto,
-            string user,
-            IDbConnection conn,
-            IDbTransaction tran)
+        private void UpdateHeader(RecipeTotalDto dto, string user, IDbConnection conn, IDbTransaction tran)
         {
+            // 如果要將此版本設為啟用，需要先將同一組合的其他版本停用
+            if (dto.IsActive)
+            {
+                conn.Execute(@"
+            UPDATE RMS.dbo.RecipeHeader 
+            SET IsActive = 0 
+            WHERE DeviceId = @deviceId 
+              AND ProdNo = @prodNo 
+              AND ISNULL(MaterialNo, '') = @materialNo 
+              AND ISNULL(MoldNo, '') = @moldNo
+              AND RecipeId != @recipeId",
+                    new
+                    {
+                        deviceId = dto.DeviceId,
+                        prodNo = dto.ProdNo,
+                        materialNo = dto.MaterialNo ?? "",
+                        moldNo = dto.MoldNo ?? "",
+                        recipeId = dto.RecipeId
+                    }, tran);
+            }
+
             conn.Execute(@"
-                    UPDATE RMS.dbo.RecipeHeader
-                    SET
-                      ProdNo      = @ProdNo,
-                      DeviceId    = @DeviceId,
-                      MoldNo      = @MoldNo,
-                      MaterialNo  = @MaterialNo,
-                      ProdName    = @ProdName,
-                      UpdateBy    = @UpdateBy,
-                      UpdateDate  = GETDATE(),
-                      Remark      = @Remark
-                    WHERE RecipeId = @RecipeId;",
+                UPDATE RMS.dbo.RecipeHeader
+                SET
+                  ProdNo      = @ProdNo,
+                  DeviceId    = @DeviceId,
+                  MoldNo      = @MoldNo,
+                  MaterialNo  = @MaterialNo,
+                  ProdName    = @ProdName,
+                  UpdateBy    = @UpdateBy,
+                  UpdateDate  = GETDATE(),
+                  Remark      = @Remark,
+                  IsActive    = @IsActive
+                WHERE RecipeId = @RecipeId;",
             new
             {
                 dto.RecipeId,
@@ -123,6 +178,7 @@ namespace RecipeManageSystem.Repository
                 dto.MaterialNo,
                 dto.ProdName,
                 dto.Remark,
+                IsActive = dto.IsActive,  // 加入 IsActive
                 UpdateBy = user
             }, tran);
         }
@@ -266,7 +322,7 @@ namespace RecipeManageSystem.Repository
                 const string sqlVersions = @"
                     SELECT 
                       h.RecipeId, h.Version, h.ProdNo, h.MaterialNo, h.MoldNo, h.DeviceId, h.Remark,
-                      h.CreateBy, h.CreateDate, h.UpdateBy, h.UpdateDate,
+                      h.CreateBy, h.CreateDate, h.IsActive, h.UpdateBy, h.UpdateDate,
                       d.ParamId, d.StdValue, d.MaxValue, d.MinValue, d.BiasMethod, d.BiasValue, d.AlarmFlag,
                       p.ParamName
                     FROM RMS.dbo.RecipeHeader h
@@ -305,6 +361,7 @@ namespace RecipeManageSystem.Repository
                     }
 
                     // 只有當 det.ParamId 有值時才加入（避免 LEFT JOIN 產生的空資料）
+                    //if (det != null && det.ParamId > 0)
                     if (det != null)
                     {
                         version.Params.Add(det);
@@ -373,6 +430,7 @@ namespace RecipeManageSystem.Repository
                     MaterialNo = materialNo,
                     MoldNo = moldNo,
                     Version = 0,
+                    IsActive = true,
                     Remark = string.Empty,
                     UpdateBy = null,
                     UpdateDate = null,
@@ -454,6 +512,35 @@ namespace RecipeManageSystem.Repository
             }
         }
 
+
+        // 在 RecipeManageRepository.cs 中新增此方法
+        /// <summary>
+        /// 取得指定機台的參數定義
+        /// </summary>
+        public List<RecipeDetailDto> GetMachineParameterDefinitions(string deviceId)
+        {
+            using (var conn = new SqlConnection(rmsString))
+            {
+                const string sql = @"
+            SELECT 
+                p.ParamId, 
+                p.ParamName, 
+                p.Unit, 
+                p.SectionCode, 
+                p.SequenceNo, 
+                p.IsActive
+            FROM RMS.dbo.MachineParameter mp
+            JOIN RMS.dbo.Parameter p ON mp.ParamId = p.ParamId
+            WHERE mp.DeviceId = @deviceId
+              AND p.IsActive = 1
+            ORDER BY p.SectionCode, p.SequenceNo, p.ParamName";
+
+                return conn.Query<RecipeDetailDto>(sql, new { deviceId }).ToList();
+            }
+        }
+
+
+
         /// <summary>
         /// 刪除指定的Recipe版本
         /// </summary>
@@ -488,5 +575,80 @@ namespace RecipeManageSystem.Repository
                 }
             }
         }
+
+
+        // 在 RecipeManageRepository.cs 中新增此方法
+        /// <summary>
+        /// 切換Recipe版本的啟用/停用狀態
+        /// </summary>
+        public bool ToggleRecipeStatus(int recipeId, bool isActive, string currentUser)
+        {
+            using (var conn = new SqlConnection(rmsString))
+            {
+                conn.Open();
+                using (var tran = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        // 如果要啟用此版本，需要先取得此Recipe的基本資訊
+                        if (isActive)
+                        {
+                            var recipeInfo = conn.QueryFirstOrDefault(@"
+                        SELECT DeviceId, ProdNo, MaterialNo, MoldNo 
+                        FROM RMS.dbo.RecipeHeader 
+                        WHERE RecipeId = @recipeId",
+                                new { recipeId }, tran);
+
+                            if (recipeInfo != null)
+                            {
+                                // 先將同一組合的其他版本停用
+                                conn.Execute(@"
+                            UPDATE RMS.dbo.RecipeHeader 
+                            SET IsActive = 0 
+                            WHERE DeviceId = @deviceId 
+                              AND ProdNo = @prodNo 
+                              AND ISNULL(MaterialNo, '') = @materialNo 
+                              AND ISNULL(MoldNo, '') = @moldNo
+                              AND RecipeId != @recipeId",
+                                    new
+                                    {
+                                        deviceId = recipeInfo.DeviceId,
+                                        prodNo = recipeInfo.ProdNo,
+                                        materialNo = recipeInfo.MaterialNo ?? "",
+                                        moldNo = recipeInfo.MoldNo ?? "",
+                                        recipeId = recipeId
+                                    }, tran);
+                            }
+                        }
+
+                        // 更新目標Recipe的狀態
+                        conn.Execute(@"
+                            UPDATE RMS.dbo.RecipeHeader 
+                            SET IsActive = @isActive, 
+                                UpdateBy = @updateBy, 
+                                UpdateDate = GETDATE() 
+                            WHERE RecipeId = @recipeId",
+                            new
+                            {
+                                isActive = isActive,
+                                updateBy = currentUser,
+                                recipeId = recipeId
+                            }, tran);
+
+                        // 記錄操作日誌
+                        InsertLog(recipeId, isActive ? "Activate" : "Deactivate", currentUser, conn, tran);
+
+                        tran.Commit();
+                        return true;
+                    }
+                    catch (Exception)
+                    {
+                        tran.Rollback();
+                        return false;
+                    }
+                }
+            }
+        }
+
     }
 }

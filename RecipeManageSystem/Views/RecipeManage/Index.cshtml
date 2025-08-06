@@ -94,7 +94,8 @@
         <!-- 空白狀態 -->
         <div id="emptyState" style="text-align: center; color: #666; padding: 80px 20px; background: #fafafa; border: 1px dashed #ddd; border-radius: 5px; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center;">
             <h3 style="color: #999; margin-bottom: 10px;">請從左側選擇一個參數配置</h3>
-            <p>選擇現有配置進行查看或編輯<br />或點擊「新增」建立新的參數配置</p>
+            <p>選擇現有配置進行查看或編輯
+<br />或點擊「新增」建立新的參數配置</p>
         </div>
 
         <!-- 編輯面板 -->
@@ -125,6 +126,10 @@
                         <input id="editRemark" class="easyui-textbox" style="width:250px;"
                                data-options="prompt:'輸入備註資訊...'" />
                     </div>
+                    <div style="display: flex; align-items: baseline; gap: 5px;">
+                        <label for="editIsActive" style="font-weight: bold; color: #333;">是否啟用:</label>
+                        <input type="checkbox" id="editIsActive" />
+                    </div>
                 </div>
                 <div style="display: flex; gap: 20px; align-items: baseline; ">
                     <div style="display: flex; align-items: center; gap: 5px;">
@@ -148,6 +153,7 @@
                              autoRowHeight:true,
                              onClickCell:onParamCellClick,
                              onEndEdit:onParamEndEdit,
+                             onLoadSuccess:onParamGridLoadSuccess,
                              scrollbarSize:4
                            ">
                         <thead>
@@ -185,228 +191,208 @@
 @section Scripts {
     <script src="~/Scripts/base/easyui/jquery.easyui.min.js"></script>
     <script>
-        // 全域變數
-        let currentRecipeId = 0;
-        let allVersions = [];
-        let currentVersionIndex = 0;
-        let editingCell = null;
-        let machineList = [];
-        let currentDeviceId = '';
-        let currentProdNo = '';
-        let currentMoldNo = '';
 
-        // 偏差方式選項
-        const biasMethodOptions = [
-            { value: 'customize', text: '自定義' },
-            { value: 'plusminus', text: '正負加減值' },
-            { value: 'percent', text: '正負百分比' }
-        ];
+// 全域變數
+let currentRecipeId = 0;
+let allVersions = [];
+let currentVersionIndex = 0;
+let editingCell = null;
+let machineList = [];
+let currentDeviceId = '';
+let currentProdNo = '';
+let currentMoldNo = '';
+let isSaving = false; // 防止重複送出
+        const editableFields = ['StdValue', 'MaxValue', 'MinValue', 'BiasMethod', 'BiasValue'];
 
-        $(function() {
-            initializePage();
-        });
+// 偏差方式選項
+const biasMethodOptions = [
+    { value: 'customize', text: '自定義' },
+    { value: 'plusminus', text: '正負加減值' },
+    { value: 'percent', text: '正負百分比' }
+];
 
-        function initializePage() {
-            loadMachineList();
-            loadInitialRecipeList();
+$(function () {
+    initializePage();
+
+    // 添加 CSS 動畫
+    if ($('head style[data-recipe-styles]').length === 0) {
+        $('head').append(`
+                    <style data-recipe-styles>
+                        @@keyframes spin {
+                            to { transform: rotate(360deg); }
+                        }
+                    </style>
+                `);
+    }
+});
+
+function initializePage() {
+    loadMachineList();
+    loadInitialRecipeList();
+}
+
+// 載入機台清單
+function loadMachineList() {
+    $.get('@Url.Action("GetMachineList", "MachineManage")', function (res) {
+        if (res.success) {
+            machineList = res.data;
+            $('#filterMachine').combobox('loadData', machineList);
         }
+    });
+}
 
-        // 載入機台清單
-        function loadMachineList() {
-            $.get('@Url.Action("GetMachineList", "MachineManage")', function(res) {
-                if (res.success) {
-                    machineList = res.data;
-                    $('#filterMachine').combobox('loadData', machineList);
-                }
-            });
-        }
+// 載入初始Recipe清單（全部）
+function loadInitialRecipeList() {
+    $('#recipeGrid').datagrid('load', {});
+}
 
-        // 載入初始Recipe清單（全部）
-        function loadInitialRecipeList() {
-            $('#recipeGrid').datagrid('load', {});
-        }
+// 機台選擇事件
+function onMachineSelect(record) {
+    currentDeviceId = record.DeviceID;
 
-        // 機台選擇事件
-        function onMachineSelect(record) {
-
-            currentDeviceId = record.DeviceID;
-
-            // 載入該機台的料號清單
-            $.get('@Url.Action("GetProdNosByDevice", "RecipeManage")', { deviceId: currentDeviceId }, function(res) {
-                if (res.success) {
-                    const prodNos = res.data.map(p => ({ ProdNo: p }));
-                    $('#filterProdNo').combobox('loadData', prodNos)
-                                     .combobox('enable')
-                                     .combobox('clear');
-                    $('#filterMoldNo').combobox('clear').combobox('disable');
-                }
-            });
-        }
-
-        function onMachineChange(newVal, oldVal) {
-            if (!newVal) {
-                $('#filterProdNo').combobox('clear').combobox('disable');
-                $('#filterMoldNo').combobox('clear').combobox('disable');
-                currentDeviceId = '';
-            }
-        }
-
-        // 料號選擇事件
-        function onProdNoSelect(record) {
-            currentProdNo = record.ProdNo;
-
-            // 載入該機台+料號的模具清單
-            $.get('@Url.Action("GetMoldNosByDeviceAndProd", "RecipeManage")', {
-                deviceId: currentDeviceId,
-                prodNo: currentProdNo
-            }, function(res) {
-                if (res.success && res.data.length > 0) {
-                    const moldNos = res.data.map(m => ({ MoldNo: m }));
-                    $('#filterMoldNo').combobox('loadData', moldNos)
-                                     .combobox('enable')
-                                     .combobox('clear');
-                } else {
-                    $('#filterMoldNo').combobox('loadData', [])
-                                     .combobox('disable');
-                }
-            });
-        }
-
-        function onProdNoChange(newVal, oldVal) {
-            if (!newVal) {
-                $('#filterMoldNo').combobox('clear').combobox('disable');
-                currentProdNo = '';
-            }
-        }
-
-        // 模具選擇事件
-        function onMoldNoSelect(record) {
-            currentMoldNo = record.MoldNo;
-        }
-
-        // 應用過濾器
-        function applyFilters() {
-            const filters = {
-                deviceName: $('#filterMachine').combobox('getText'),
-                prodNo: $('#filterProdNo').combobox('getValue'),
-                moldNo: $('#filterMoldNo').combobox('getValue')
-            };
-
-            $('#recipeGrid').datagrid('load', filters);
-        }
-
-        // 清除過濾器
-        function clearFilters() {
-            $('#filterMachine').combobox('clear');
-            $('#filterProdNo').combobox('clear').combobox('disable');
+    // 載入該機台的料號清單
+    $.get('@Url.Action("GetProdNosByDevice", "RecipeManage")', { deviceId: currentDeviceId }, function (res) {
+        if (res.success) {
+            const prodNos = res.data.map(p => ({ ProdNo: p }));
+            $('#filterProdNo').combobox('loadData', prodNos)
+                .combobox('enable')
+                .combobox('clear');
             $('#filterMoldNo').combobox('clear').combobox('disable');
-            currentDeviceId = '';
-            currentProdNo = '';
-            currentMoldNo = '';
-            $('#recipeGrid').datagrid('load', {});
         }
+    });
+}
 
-        // Recipe清單載入完成
-        function onRecipeGridLoad(data) {
-            // 可以在這裡做一些載入後的處理
-            customizePagination();
+function onMachineChange(newVal, oldVal) {
+    if (!newVal) {
+        $('#filterProdNo').combobox('clear').combobox('disable');
+        $('#filterMoldNo').combobox('clear').combobox('disable');
+        currentDeviceId = '';
+    }
+}
+
+// 料號選擇事件
+function onProdNoSelect(record) {
+    currentProdNo = record.ProdNo;
+
+    // 載入該機台+料號的模具清單
+    $.get('@Url.Action("GetMoldNosByDeviceAndProd", "RecipeManage")', {
+        deviceId: currentDeviceId,
+        prodNo: currentProdNo
+    }, function (res) {
+        if (res.success && res.data.length > 0) {
+            const moldNos = res.data.map(m => ({ MoldNo: m }));
+            $('#filterMoldNo').combobox('loadData', moldNos)
+                .combobox('enable')
+                .combobox('clear');
+        } else {
+            $('#filterMoldNo').combobox('loadData', [])
+                .combobox('disable');
         }
+    });
+}
 
-        function customizePagination() {
-            var pager = $('#recipeGrid').datagrid('getPager');
-            if (pager.length) {
-                // 隱藏頁數輸入相關元素
-                pager.find('.pagination-num').closest('td').hide(); // 隱藏輸入框
-                pager.find('td:contains("Page")').hide(); // 隱藏 "Page" 文字
-                pager.find('td:contains("of")').hide(); // 隱藏 "of X" 文字
+function onProdNoChange(newVal, oldVal) {
+    if (!newVal) {
+        $('#filterMoldNo').combobox('clear').combobox('disable');
+        currentProdNo = '';
+    }
+}
 
-                // 也可以隱藏首頁和末頁按鈕（可選）
-                pager.find('.pagination-first').closest('td').hide();
-                pager.find('.pagination-last').closest('td').hide();
+// 模具選擇事件
+function onMoldNoSelect(record) {
+    currentMoldNo = record.MoldNo;
+}
 
-                // 隱藏多餘的分隔線
-                pager.find('.pagination-btn-separator').hide();
-            }
+// 應用過濾器
+function applyFilters() {
+    const filters = {
+        deviceName: $('#filterMachine').combobox('getText'),
+        prodNo: $('#filterProdNo').combobox('getValue'),
+        moldNo: $('#filterMoldNo').combobox('getValue')
+    };
+
+    $('#recipeGrid').datagrid('load', filters);
+}
+
+// 清除過濾器
+function clearFilters() {
+    $('#filterMachine').combobox('clear');
+    $('#filterProdNo').combobox('clear').combobox('disable');
+    $('#filterMoldNo').combobox('clear').combobox('disable');
+    currentDeviceId = '';
+    currentProdNo = '';
+    currentMoldNo = '';
+    $('#recipeGrid').datagrid('load', {});
+}
+
+// Recipe清單載入完成
+function onRecipeGridLoad(data) {
+    customizePagination();
+}
+
+function customizePagination() {
+    var pager = $('#recipeGrid').datagrid('getPager');
+    if (pager.length) {
+        pager.find('.pagination-num').closest('td').hide();
+        pager.find('td:contains("Page")').hide();
+        pager.find('td:contains("of")').hide();
+        pager.find('.pagination-first').closest('td').hide();
+        pager.find('.pagination-last').closest('td').hide();
+        pager.find('.pagination-btn-separator').hide();
+    }
+}
+
+// 選擇Recipe事件
+function onRecipeSelect(index, row) {
+    loadRecipeVersions(row.DeviceId, row.ProdNo, row.MaterialNo || '', row.MoldNo || '');
+}
+
+// 載入Recipe版本資料
+function loadRecipeVersions(deviceId, prodNo, materialNo, moldNo) {
+    $.get('@Url.Action("GetDetailToEdit", "RecipeManage")', {
+        deviceId: deviceId,
+        prodNo: prodNo,
+        materialNo: materialNo,
+        moldNo: moldNo
+    }, function (res) {
+        console.log("loadRecipeVersions; GetDetailToEdit;", res)
+        if (res.success && res.data.length > 0) {
+            allVersions = res.data;
+            currentVersionIndex = 0;
+            currentRecipeId = allVersions[0].RecipeId;
+
+            showEditPanel();
+            loadVersionDetail(0);
+        } else {
+            hideEditPanel();
         }
+    });
+}
 
-        // 選擇Recipe事件
-        function onRecipeSelect(index, row) {
-            loadRecipeVersions(row.DeviceId, row.ProdNo, row.MaterialNo || '', row.MoldNo || '');
-        }
+// 顯示編輯面板
+function showEditPanel() {
+    $('#emptyState').hide();
+    $('#editPanel').css('display', 'flex');
+}
 
-        // 載入Recipe版本資料
-        function loadRecipeVersions(deviceId, prodNo, materialNo, moldNo) {
-            $.get('@Url.Action("GetDetailToEdit", "RecipeManage")', {
-                deviceId: deviceId,
-                prodNo: prodNo,
-                materialNo: materialNo,
-                moldNo: moldNo
-            }, function (res) {
-                console.log("loadRecipeVersions; GetDetailToEdit;", res)
-                if (res.success && res.data.length > 0) {
-                    allVersions = res.data;
-                    currentVersionIndex = 0;
-                    currentRecipeId = allVersions[0].RecipeId;
+// 隱藏編輯面板
+function hideEditPanel() {
+    $('#editPanel').hide();
+    $('#emptyState').show();
+}
 
-                    showEditPanel();
-                    //renderVersionTabs();
-                    loadVersionDetail(0);
-                } else {
-                    hideEditPanel();
-                }
-            });
-        }
-
-        // 顯示編輯面板
-        function showEditPanel() {
-            $('#emptyState').hide();
-            $('#editPanel').css('display', 'flex'); // 重要：使用 flex 佈局
-        }
-
-        // 隱藏編輯面板
-        function hideEditPanel() {
-            $('#editPanel').hide();
-            $('#emptyState').show();
-        }
-
-        // 渲染版本標籤
-        function renderVersionTabs() {
-            alert("該功能取消")
-            //const tabsHtml = allVersions.map((version, index) =>
-            //    `<a href="javascript:void(0)" onclick="switchVersion(${index})"
-            //       style="padding: 6px 12px; background: ${index === currentVersionIndex ? '#e6f3ff' : '#f0f0f0'}; border: 1px solid #ccc; cursor: pointer; text-decoration: none; color: #333; border-radius: 3px 3px 0 0; font-weight: ${index === currentVersionIndex ? 'bold' : 'normal'};">
-            //       版本 ${version.Version}
-            //     </a>`
-            //).join('');
-
-            //$('#versionTabs').html(tabsHtml);
-            //$('#versionCount').text(`共 ${allVersions.length} 個版本`);
-        }
-
-        // 切換版本
-        function switchVersion(index) {
-            alert("該功能取消")
-            //if (currentVersionIndex !== index) {
-            //    endCurrentEdit();
-            //    currentVersionIndex = index;
-            //    currentRecipeId = allVersions[index].RecipeId;
-            //    loadVersionDetail(index);
-            //    renderVersionTabs();
-            //}
-        }
-
-        // 載入版本詳細資料
-        // 在 loadVersionDetail 函數中加入這段邏輯
+// 載入版本詳細資料
         function loadVersionDetail(index) {
             const version = allVersions[index];
-            console.log({ allVersions })
-            // 更新基本資訊顯示
+            console.log('載入版本詳細資料:', version);
             const machine = machineList.find(m => m.DeviceID === version.DeviceId);
             $('#displayDeviceName').text(machine ? machine.DeviceName : version.DeviceId);
             $('#displayProdNo').text(version.ProdNo || '-');
             $('#displayMoldNo').text(version.MoldNo || '-');
             $('#displayVersion').text(`v${version.Version}`);
             $('#editRemark').textbox('setValue', version.Remark || '');
+            $('#editIsActive').prop('checked', !!version.IsActive);
+            console.log('設定 IsActive 狀態:', version.IsActive);
 
             // 更新者資訊
             const updateBy = version.UpdateBy || version.CreateBy || '-';
@@ -423,143 +409,250 @@
                 BiasMethod: p.BiasMethod || 'customize',
                 BiasValue: p.BiasValue || '',
                 AlarmFlag: p.AlarmFlag || 'Y',
-                // 標記是否為新參數（沒有填入 StdValue）
                 _isNewParam: !p.StdValue || p.StdValue.trim() === ''
             }));
 
             $('#paramGrid').datagrid('loadData', paramData);
 
-            // 重新調整表格大小
-            setTimeout(function() {
+            // 注意：這裡不需要手動調用 addAlarmFlagClickHandlers
+            // 因為 loadData 會觸發 onLoadSuccess 事件
+            setTimeout(() => {
                 $('#paramGrid').datagrid('resize');
-
-                // 為新參數添加視覺提示
                 highlightNewParams();
-            }, 100);
+                addAlarmFlagClickHandlers(); // 重新綁定事件
+            }, 200);
         }
 
-        // 高亮顯示新參數
-        function highlightNewParams() {
-            const rows = $('#paramGrid').datagrid('getRows');
-            rows.forEach((row, index) => {
-                if (row._isNewParam) {
-                    // 為新參數行添加背景色
-                    $('#paramGrid').datagrid('getPanel').find(`tr[datagrid-row-index="${index}"]`)
-                        .css('background-color', '#fff3cd')
-                        .attr('title', '此參數尚未設定數值，可以填入後儲存');
+
+        function addAlarmFlagClickHandlers() {
+            console.log('添加 AlarmFlag 點擊處理器');
+
+            // 移除舊的事件處理器，避免重複綁定
+            $('#paramGrid .datagrid-body').off('click.alarmToggle');
+
+            // 使用事件委派，直接綁定到 datagrid-body 上
+            $('#paramGrid .datagrid-body').on('click.alarmToggle', 'td[field="AlarmFlag"]', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const $row = $(this).closest('tr');
+                const rowIndex = parseInt($row.attr('datagrid-row-index'));
+
+                console.log('點擊 AlarmFlag，行索引:', rowIndex);
+
+                if (!isNaN(rowIndex)) {
+                    toggleAlarmFlag(rowIndex);
                 }
             });
-        }
-        // 在參數名稱的格式化函數中也可以加入提示
-        function formatParamName(value, row, index) {
-            if (row._isNewParam) {
-                return `<span style="color: #856404;">${value} <i class="fa fa-plus-circle" title="新增參數"></i></span>`;
-            }
-            return value;
+
+            // 添加視覺樣式和提示
+            $('#paramGrid .datagrid-body td[field="AlarmFlag"]').css({
+                'cursor': 'pointer',
+                'transition': 'background-color 0.2s',
+                'user-select': 'none'
+            }).attr('title', '點擊切換警報狀態')
+                .hover(
+                    function () { $(this).css('background-color', '#e8f4fd'); },
+                    function () { $(this).css('background-color', ''); }
+                );
         }
 
-        // 更新 DataGrid 的 columns 配置
-        const paramGridColumns = [[
-            {
-                field: 'ParamName',
-                title: '參數名稱',
-                width: 120,
-                formatter: formatParamName
-            },
-            { field: 'StdValue', title: '標準值', width: 80, align: 'center', editor: { type: 'textbox' } },
-            { field: 'MaxValue', title: '上限值', width: 80, align: 'center', editor: { type: 'textbox' } },
-            { field: 'MinValue', title: '下限值', width: 80, align: 'center', editor: { type: 'textbox' } },
-            {
-                field: 'BiasMethod',
-                title: '偏差方式',
-                width: 90,
-                align: 'center',
-                formatter: formatBiasMethod,
-                editor: {
-                    type: 'combobox',
-                    options: {
-                        valueField: 'value',
-                        textField: 'text',
-                        panelHeight: 'auto'
+// 切換警報旗標
+        // 修正後的 AlarmFlag 點擊處理函數
+
+        function addAlarmFlagClickHandlers() {
+            console.log('開始添加 AlarmFlag 點擊處理器');
+
+            setTimeout(() => {
+                // 移除舊的事件處理器，避免重複綁定
+                $('#paramGrid .datagrid-body').off('click.alarmToggle');
+
+                // 方法1：使用更精確的選擇器和事件委派
+                $('#paramGrid .datagrid-body').on('click.alarmToggle', 'tr td[field="AlarmFlag"]', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    console.log('AlarmFlag cell 被點擊');
+
+                    // 找到對應的行索引
+                    const $row = $(this).closest('tr');
+                    const rowIndex = parseInt($row.attr('datagrid-row-index'));
+
+                    console.log('點擊 AlarmFlag，行索引:', rowIndex);
+
+                    if (!isNaN(rowIndex)) {
+                        toggleAlarmFlag(rowIndex);
                     }
+                });
+
+                // 方法2：同時也綁定到 cell 內的內容
+                $('#paramGrid .datagrid-body').on('click.alarmToggleIcon', 'td[field="AlarmFlag"] *', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    console.log('AlarmFlag 內容被點擊');
+
+                    // 找到對應的行索引
+                    const $row = $(this).closest('tr');
+                    const rowIndex = parseInt($row.attr('datagrid-row-index'));
+
+                    console.log('點擊 AlarmFlag 內容，行索引:', rowIndex);
+
+                    if (!isNaN(rowIndex)) {
+                        toggleAlarmFlag(rowIndex);
+                    }
+                });
+
+                // 添加樣式和提示
+                $('#paramGrid .datagrid-body td[field="AlarmFlag"]').each(function () {
+                    $(this).css({
+                        'cursor': 'pointer',
+                        'transition': 'background-color 0.2s',
+                        'user-select': 'none'  // 防止文字選取
+                    }).attr('title', '點擊切換警報狀態')
+                        .hover(
+                            function () {
+                                $(this).css('background-color', '#e8f4fd');
+                            },
+                            function () {
+                                $(this).css('background-color', '');
+                            }
+                        );
+                });
+
+                // 檢查實際渲染的元素
+                const alarmCells = $('#paramGrid .datagrid-body td[field="AlarmFlag"]');
+                console.log(`找到 ${alarmCells.length} 個 AlarmFlag 欄位`);
+
+                // 為了除錯，我們來看看實際的 DOM 結構
+                if (alarmCells.length > 0) {
+                    console.log('第一個 AlarmFlag cell 的 HTML:', alarmCells.first().html());
+                    console.log('第一個 AlarmFlag cell 的屬性:', alarmCells.first()[0].outerHTML);
                 }
-            },
-            { field: 'BiasValue', title: '偏差值', width: 70, align: 'center', editor: { type: 'numberbox', options: { precision: 2 } } },
-            {
-                field: 'AlarmFlag',
-                title: '警報',
-                width: 50,
-                align: 'center',
-                formatter: formatAlarmFlag,
-                editor: {
-                    type: 'checkbox',
-                    options: { on: 'Y', off: 'N' }
-                }
+
+                console.log('AlarmFlag 點擊處理器添加完成');
+            }, 300); // 增加延遲時間，確保 DOM 完全渲染
+        }
+
+        // 修正後的切換警報旗標函數
+        function toggleAlarmFlag(rowIndex) {
+            console.log('切換警報旗標，行索引:', rowIndex);
+
+            const rows = $('#paramGrid').datagrid('getRows');
+            if (rows[rowIndex]) {
+                const currentValue = rows[rowIndex].AlarmFlag;
+                const newValue = currentValue === 'Y' ? 'N' : 'Y';
+
+                console.log(`切換警報狀態：${currentValue} -> ${newValue}`);
+
+                // 更新資料
+                $('#paramGrid').datagrid('updateRow', {
+                    index: rowIndex,
+                    row: { AlarmFlag: newValue }
+                });
+
+                // 給用戶一個視覺反饋
+                const $cell = $(`#paramGrid .datagrid-body tr[datagrid-row-index="${rowIndex}"] td[field="AlarmFlag"]`);
+                $cell.css('background-color', '#d4edda');
+                setTimeout(() => {
+                    $cell.css('background-color', '');
+                    // 重新綁定事件處理器
+                    addAlarmFlagClickHandlers();
+                }, 300);
             }
-        ]];
+        }
 
-        // 在儲存前過濾掉空值參數的邏輯
-        function saveRecipe(mode) {
-            endCurrentEdit();
 
-            const allParamRows = $('#paramGrid').datagrid('getRows');
+// 高亮顯示新參數
+function highlightNewParams() {
+    const rows = $('#paramGrid').datagrid('getRows');
+    rows.forEach((row, index) => {
+        if (row._isNewParam) {
+            $('#paramGrid').datagrid('getPanel').find(`tr[datagrid-row-index="${index}"]`)
+                .css('background-color', '#fff3cd')
+                .attr('title', '此參數尚未設定數值，可以填入後儲存');
+        }
+    });
+}
 
-            // 只儲存有填入 StdValue 的參數
-            const paramRows = allParamRows.filter(row =>
-                row.StdValue && row.StdValue.toString().trim() !== ''
-            );
+// 控制按鈕狀態
+function setButtonsEnabled(enabled) {
+    const buttons = ['#saveBtn', '#newVersionBtn', '#deleteBtn'];
+    buttons.forEach(btnId => {
+        const $btn = $(btnId);
+        if (enabled) {
+            $btn.css({
+                'background': '',
+                'color': '',
+                'border-color': '',
+                'cursor': '',
+                'opacity': '',
+                'pointer-events': ''
+            }).removeAttr('disabled');
+        } else {
+            $btn.css({
+                'background': '#f0f0f0',
+                'color': '#999',
+                'border-color': '#ddd',
+                'cursor': 'not-allowed',
+                'opacity': '0.6',
+                'pointer-events': 'none'
+            }).attr('disabled', 'disabled');
+        }
+    });
+}
 
-            if (paramRows.length === 0) {
-                $.messager.alert('提示', '請至少填入一個參數的標準值');
+// 顯示/隱藏載入遮罩
+function showSaveOverlay() {
+    if ($('#saveOverlay').length === 0) {
+        $('body').append(`
+                    <div id="saveOverlay" style="
+                        display: none;
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background-color: rgba(0, 0, 0, 0.5);
+                        z-index: 9999;
+                        justify-content: center;
+                        align-items: center;
+                        font-size: 18px;
+                        color: white;
+                    ">
+                        <div>
+                            <div style="
+                                display: inline-block;
+                                width: 20px;
+                                height: 20px;
+                                border: 3px solid rgba(255,255,255,.3);
+                                border-radius: 50%;
+                                border-top-color: #fff;
+                                animation: spin 1s ease-in-out infinite;
+                            "></div>
+                            <span style="margin-left: 10px;">儲存中，請稍候...</span>
+                        </div>
+                    </div>
+                `);
+    }
+    $('#saveOverlay').css('display', 'flex');
+}
+
+function hideSaveOverlay() {
+    $('#saveOverlay').hide();
+}
+
+// 參數表格單元格點擊 - 修正版本
+        function onParamCellClick(index, field) {
+            // 如果是 AlarmFlag 欄位，直接處理切換，不進入編輯模式
+            if (field === 'AlarmFlag') {
+                toggleAlarmFlag(index);
                 return;
             }
 
-            const currentVersion = allVersions[currentVersionIndex];
-
-            const dto = {
-                Mode: mode,
-                RecipeId: currentRecipeId,
-                ProdNo: currentVersion.ProdNo,
-                MaterialNo: currentVersion.MaterialNo,
-                MoldNo: currentVersion.MoldNo,
-                DeviceId: currentVersion.DeviceId,
-                Remark: $('#editRemark').textbox('getValue'),
-                RecipeDetails: paramRows
-            };
-
-            $.ajax({
-                url: '@Url.Action("SaveRecipe", "RecipeManage")',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify(dto),
-                success: function(res) {
-                    if (res.success) {
-                        $.messager.show({
-                            title: '成功',
-                            msg: `儲存完成！已儲存 ${paramRows.length} 個參數`,
-                            timeout: 3000,
-                            showType: 'slide'
-                        });
-
-                        // 重新載入
-                        loadRecipeVersions(currentVersion.DeviceId, currentVersion.ProdNo,
-                                         currentVersion.MaterialNo, currentVersion.MoldNo);
-                        applyFilters();
-                    } else {
-                        $.messager.alert('錯誤', res.message || '儲存失敗');
-                    }
-                },
-                error: function() {
-                    $.messager.alert('錯誤', '儲存時發生錯誤');
-                }
-            });
-        }
-
-        // 參數表格單元格點擊
-        function onParamCellClick(index, field) {
             endCurrentEdit();
 
-            if (['StdValue', 'MaxValue', 'MinValue', 'BiasMethod', 'BiasValue', 'AlarmFlag'].includes(field)) {
+            if (['StdValue', 'MaxValue', 'MinValue', 'BiasMethod', 'BiasValue'].includes(field)) {
                 $('#paramGrid').datagrid('beginEdit', index);
 
                 // 設定偏差方式的選項
@@ -571,141 +664,312 @@
                 }
 
                 editingCell = { index: index, field: field };
+
+                // 自動 focus 到編輯器
+                setTimeout(() => {
+                    const editor = $('#paramGrid').datagrid('getEditor', { index: index, field: field });
+                    if (editor) {
+                        if (field === 'BiasMethod') {
+                            $(editor.target).combobox('textbox').focus();
+                        } else {
+                            $(editor.target).textbox('textbox').focus().select();
+                        }
+                    }
+                }, 50);
             }
         }
 
-        // 參數編輯結束
-        function onParamEndEdit(index, row, changes) {
-            // 自動計算偏差值
-            if ('BiasValue' in changes || 'BiasMethod' in changes || 'StdValue' in changes) {
-                calculateBiasValues(index, row);
+// 參數編輯結束
+function onParamEndEdit(index, row, changes) {
+    if ('BiasValue' in changes || 'BiasMethod' in changes || 'StdValue' in changes) {
+        calculateBiasValues(index, row);
+    }
+}
+
+// 結束當前編輯
+function endCurrentEdit() {
+    if (editingCell) {
+        $('#paramGrid').datagrid('endEdit', editingCell.index);
+        editingCell = null;
+    }
+}
+
+// 計算偏差值
+function calculateBiasValues(index, row) {
+    const std = parseFloat(row.StdValue) || 0;
+    const bias = parseFloat(row.BiasValue) || 0;
+    let max = std, min = std;
+
+    if (row.BiasMethod === 'plusminus') {
+        max = std + bias;
+        min = std - bias;
+    } else if (row.BiasMethod === 'percent') {
+        max = std * (1 + bias / 100);
+        min = std * (1 - bias / 100);
+    }
+
+    if (row.BiasMethod !== 'customize') {
+        $('#paramGrid').datagrid('updateRow', {
+            index: index,
+            row: {
+                MaxValue: max.toFixed(2),
+                MinValue: min.toFixed(2)
+            }
+        });
+    }
+}
+
+// 新增Recipe
+function createNewRecipe() {
+    const deviceId = $('#filterMachine').combobox('getValue');
+    const prodNo = $('#filterProdNo').combobox('getValue');
+
+    if (!deviceId) {
+        $.messager.alert('提示', '請先選擇機台');
+        return;
+    }
+
+    if (!prodNo) {
+        $.messager.alert('提示', '請先輸入或選擇料號');
+        return;
+    }
+
+    const moldNo = $('#filterMoldNo').combobox('getValue') || '';
+
+    $.messager.confirm('確認',
+        `確定要為以下組合建立新參數配置嗎？<br/>
+                機台：${$('#filterMachine').combobox('getText')}<br/>
+                料號：${prodNo}<br/>
+                模具：${moldNo || '(無)'}`,
+        function (r) {
+            if (r) {
+                loadRecipeVersions(deviceId, prodNo, '', moldNo)
             }
         }
+    );
+}
 
-        // 結束當前編輯
-        function endCurrentEdit() {
-            if (editingCell) {
-                $('#paramGrid').datagrid('endEdit', editingCell.index);
-                editingCell = null;
+// 儲存Recipe - 統一版本（修正重複函數問題）
+function saveRecipe(mode) {
+    // 防止重複提交
+    if (isSaving) {
+        return;
+    }
+
+    endCurrentEdit();
+
+    const allParamRows = $('#paramGrid').datagrid('getRows');
+
+    // 只儲存有填入 StdValue 的參數
+    const paramRows = allParamRows.filter(row =>
+        row.StdValue && row.StdValue.toString().trim() !== ''
+    );
+
+    console.log(paramRows.length, "paramRows.length");
+    if (paramRows.length === 0) {
+        $.messager.alert('提示', '請至少填入一個參數的標準值');
+        return;
+    }
+
+    // 設置儲存狀態
+    isSaving = true;
+    setButtonsEnabled(false);
+    showSaveOverlay();
+
+    const currentVersion = allVersions[currentVersionIndex];
+    const isActive = $('#editIsActive').is(':checked');
+
+    const dto = {
+        Mode: mode,
+        RecipeId: currentRecipeId,
+        ProdNo: currentVersion.ProdNo,
+        MaterialNo: currentVersion.MaterialNo,
+        MoldNo: currentVersion.MoldNo,
+        DeviceId: currentVersion.DeviceId,
+        Remark: $('#editRemark').textbox('getValue'),
+        IsActive: isActive,
+        RecipeDetails: paramRows
+    };
+
+    console.log('儲存的 DTO:', dto);
+
+    $.ajax({
+        url: '@Url.Action("SaveRecipe", "RecipeManage")',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(dto),
+        success: function (res) {
+            if (res.success) {
+                const alarmEnabledCount = paramRows.filter(p => p.AlarmFlag === 'Y').length;
+                const alarmDisabledCount = paramRows.filter(p => p.AlarmFlag === 'N').length;
+                const isActiveText = isActive ? '已啟用' : '已停用';
+
+                let message = `儲存完成！已儲存 ${paramRows.length} 個參數，版本狀態：${isActiveText}`;
+                if (alarmDisabledCount > 0) {
+                    message += `<br/>參數警報：${alarmEnabledCount} 個啟用，${alarmDisabledCount} 個停用`;
+                }
+
+                $.messager.show({
+                    title: '成功',
+                    msg: message,
+                    timeout: 3000,
+                    showType: 'slide'
+                });
+
+                // 重新載入
+                loadRecipeVersions(currentVersion.DeviceId, currentVersion.ProdNo,
+                    currentVersion.MaterialNo, currentVersion.MoldNo);
+                applyFilters();
+            } else {
+                $.messager.alert('錯誤', res.message || '儲存失敗');
             }
+        },
+        error: function () {
+            $.messager.alert('錯誤', '儲存時發生錯誤');
+        },
+        complete: function () {
+            // 無論成功或失敗都要恢復狀態
+            hideSaveOverlay();
+            isSaving = false;
+            setButtonsEnabled(true);
         }
+    });
+}
 
-        // 計算偏差值
-        function calculateBiasValues(index, row) {
-            const std = parseFloat(row.StdValue) || 0;
-            const bias = parseFloat(row.BiasValue) || 0;
-            let max = std, min = std;
+        function addAlarmFlagClickHandlersAlternative() {
+            console.log('使用替代方案添加 AlarmFlag 點擊處理器');
 
-            if (row.BiasMethod === 'plusminus') {
-                max = std + bias;
-                min = std - bias;
-            } else if (row.BiasMethod === 'percent') {
-                max = std * (1 + bias / 100);
-                min = std * (1 - bias / 100);
-            }
+            setTimeout(() => {
+                // 直接為每個 AlarmFlag 欄位綁定點擊事件
+                $('#paramGrid .datagrid-body tr').each(function (index) {
+                    const $row = $(this);
+                    const rowIndex = parseInt($row.attr('datagrid-row-index'));
 
-            if (row.BiasMethod !== 'customize') {
-                $('#paramGrid').datagrid('updateRow', {
-                    index: index,
-                    row: {
-                        MaxValue: max.toFixed(2),
-                        MinValue: min.toFixed(2)
+                    if (!isNaN(rowIndex)) {
+                        // 移除舊的事件處理器
+                        $row.find('td[field="AlarmFlag"]').off('click.alarmDirect');
+
+                        // 直接綁定到該 cell
+                        $row.find('td[field="AlarmFlag"]').on('click.alarmDirect', function (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+
+                            console.log('直接點擊 AlarmFlag，行索引:', rowIndex);
+                            toggleAlarmFlag(rowIndex);
+                        });
+
+                        // 設定樣式
+                        $row.find('td[field="AlarmFlag"]').css({
+                            'cursor': 'pointer',
+                            'user-select': 'none'
+                        }).attr('title', '點擊切換警報狀態');
                     }
                 });
+
+                console.log('替代方案設定完成');
+            }, 200);
+        }
+
+        // 參數表格載入完成後的回調 - 函數名稱要對應 HTML 中的 onLoadSuccess
+        function onParamGridLoadSuccess(data) {
+            console.log('參數表格載入完成');
+            // 延遲執行，確保 DOM 完全渲染
+            setTimeout(() => {
+                addAlarmFlagClickHandlers();
+                highlightNewParams();
+            }, 100);
+        }
+
+
+// 刪除當前Recipe
+function deleteCurrentRecipe() {
+    if (currentRecipeId <= 0) return;
+
+    $.messager.confirm('確認', '確定要刪除此版本嗎？此操作無法復原！', function (r) {
+        if (r) {
+            // 防止重複提交
+            if (isSaving) {
+                return;
             }
-        }
 
-        // 新增Recipe
-        function createNewRecipe() {
-            // 實作新增邏輯
-            $.messager.alert('提示', '新增功能開發中...');
-        }
-
-        // 儲存Recipe
-        function saveRecipe(mode) {
-            endCurrentEdit();
-
-            const paramRows = $('#paramGrid').datagrid('getRows');
-            const currentVersion = allVersions[currentVersionIndex];
-
-            const dto = {
-                Mode: mode,
-                RecipeId: currentRecipeId,
-                ProdNo: currentVersion.ProdNo,
-                MaterialNo: currentVersion.MaterialNo,
-                MoldNo: currentVersion.MoldNo,
-                DeviceId: currentVersion.DeviceId,
-                Remark: $('#editRemark').textbox('getValue'),
-                RecipeDetails: paramRows
-            };
+            isSaving = true;
+            setButtonsEnabled(false);
+            showSaveOverlay();
 
             $.ajax({
-                url: '@Url.Action("SaveRecipe", "RecipeManage")',
+                url: '@Url.Action("DeleteRecipe", "RecipeManage")',
                 type: 'POST',
                 contentType: 'application/json',
-                data: JSON.stringify(dto),
-                success: function(res) {
+                data: JSON.stringify({ recipeId: currentRecipeId }),
+                success: function (res) {
                     if (res.success) {
                         $.messager.show({
                             title: '成功',
-                            msg: '儲存完成！',
+                            msg: '版本已刪除',
                             timeout: 2000,
                             showType: 'slide'
                         });
-
-                        // 重新載入
-                        loadRecipeVersions(currentVersion.DeviceId, currentVersion.ProdNo,
-                                         currentVersion.MaterialNo, currentVersion.MoldNo);
+                        hideEditPanel();
                         applyFilters();
                     } else {
-                        $.messager.alert('錯誤', res.message || '儲存失敗');
+                        $.messager.alert('錯誤', res.message || '刪除失敗');
                     }
                 },
-                error: function() {
-                    $.messager.alert('錯誤', '儲存時發生錯誤');
+                error: function () {
+                    $.messager.alert('錯誤', '刪除時發生錯誤');
+                },
+                complete: function () {
+                    hideSaveOverlay();
+                    isSaving = false;
+                    setButtonsEnabled(true);
                 }
             });
         }
+    });
+}
 
-        // 刪除當前Recipe
-        function deleteCurrentRecipe() {
-            if (currentRecipeId <= 0) return;
+// 格式化函數
+function formatActive(value, row, index) {
+    if (value) {
+        return '<i class="fa fa-check-circle" style="color:green;" title="此版本已啟用"></i>';
+    } else {
+        return '<i class="fa fa-circle-o" style="color:gray;" title="此版本已停用"></i>';
+    }
+}
 
-            $.messager.confirm('確認', '確定要刪除此版本嗎？此操作無法復原！', function(r) {
-                if (r) {
-                    $.messager.alert('提示', '刪除功能開發中...');
-                }
-            });
-        }
+function formatDate(value) {
+    if (!value) return '';
+    const matches = /\/Date\((\d+)\)\//.exec(value);
+    if (!matches) return '';
+    const date = new Date(parseInt(matches[1]));
+    return date.toLocaleDateString();
+}
 
-        // 格式化函數
-        function formatActive(value) {
-            return value ? '<i class="fa fa-check" style="color:green;"></i>' : '<i class="fa fa-times" style="color:red;"></i>';
-        }
+function formatDateTime(value) {
+    if (!value) return '-';
+    const matches = /\/Date\((\d+)\)\//.exec(value);
+    if (!matches) return value;
+    const date = new Date(parseInt(matches[1]));
+    return date.toLocaleString();
+}
 
-        function formatDate(value) {
-            if (!value) return '';
-            const matches = /\/Date\((\d+)\)\//.exec(value);
-            if (!matches) return '';
-            const date = new Date(parseInt(matches[1]));
-            return date.toLocaleDateString();
-        }
+function formatBiasMethod(value) {
+    const option = biasMethodOptions.find(o => o.value === value);
+    return option ? option.text : value;
+}
 
-        function formatDateTime(value) {
-            if (!value) return '-';
-            const matches = /\/Date\((\d+)\)\//.exec(value);
-            if (!matches) return value;
-            const date = new Date(parseInt(matches[1]));
-            return date.toLocaleString();
-        }
+function formatAlarmFlag(value) {
+    return value === 'Y' ? '<i class="fa fa-check" style="color:green;"></i>' : '<i class="fa fa-times" style="color:red;"></i>';
+}
 
-        function formatBiasMethod(value) {
-            const option = biasMethodOptions.find(o => o.value === value);
-            return option ? option.text : value;
-        }
+// 在參數名稱的格式化函數中加入提示
+function formatParamName(value, row, index) {
+    if (row._isNewParam) {
+        return `<span style="color: #856404;">${value} <i class="fa fa-plus-circle" title="新增參數"></i></span>`;
+    }
+    return value;
+}
 
-        function formatAlarmFlag(value) {
-            return value === 'Y' ? '<i class="fa fa-check" style="color:green;"></i>' : '<i class="fa fa-times" style="color:red;"></i>';
-        }
+
     </script>
 }

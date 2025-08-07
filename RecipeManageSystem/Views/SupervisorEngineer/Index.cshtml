@@ -1,0 +1,277 @@
+﻿@{
+    ViewBag.Title = "主管-工程師維護表";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+@section css {
+    <link rel="stylesheet" href="@Href("~/Scripts/base/easyui/themes/icon.css")" />
+    <link rel="stylesheet" href="@Href("~/Scripts/base/easyui/themes/bootstrap/easyui.css")" />
+}
+
+<h2>主管工程師關係維護</h2>
+
+<table id="relationGrid" class="easyui-datagrid" style="width:100%;">
+    <thead>
+        <tr>
+            <th data-options="field:'Id',hidden:true">ID</th>
+            <th data-options="field:'SupervisorNo',width:80">主管工號</th>
+            <th data-options="field:'SupervisorName',width:80">主管姓名</th>
+            <th data-options="field:'EngineerNo',width:80">工程師工號</th>
+            <th data-options="field:'EngineerName',width:80">工程師姓名</th>
+            <th data-options="field:'EffectiveDate',width:80,formatter:formatDate">生效日期</th>
+            <th data-options="field:'ExpiryDate',width:80,formatter:formatDate">失效日期</th>
+            <th data-options="field:'IsActive',width:60,align:'center',formatter:formatActive">是否啟用</th>
+            <th data-options="field:'UpdateTime',width:120,formatter:formatDateTime">更新時間</th>
+        </tr>
+    </thead>
+</table>
+
+<div id="toolbar" style="padding:5px; display:flex; align-items:center">
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="openDialog()">新增</a>
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="editDialog()">編輯</a>
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="deleteRelation()">刪除</a>
+</div>
+
+<!-- 新增/編輯 Dialog -->
+<div id="dlg" class="easyui-dialog" style="width:450px" closed="true" buttons="#dlg-buttons" modal="true">
+    <form id="relationForm" method="post" style="padding:10px">
+        <input type="hidden" name="Id" id="Id" />
+
+        <div style="margin-bottom:10px">
+            <label style="display:inline-block;width:80px">主管：</label>
+            <select name="SupervisorNo" id="SupervisorNo" class="easyui-combobox" style="width:300px"
+                    data-options="valueField:'EngineerNo',textField:'display',editable:true,filter:function(q,row){return row.display.indexOf(q)>=0;},onSelect:onSupervisorSelect">
+            </select>
+        </div>
+
+        <div style="margin-bottom:10px">
+            <label style="display:inline-block;width:80px">工程師：</label>
+            <select name="EngineerNo" id="EngineerNo" class="easyui-combobox" style="width:300px"
+                    data-options="valueField:'EngineerNo',textField:'display',editable:true,filter:function(q,row){return row.display.indexOf(q)>=0;},onSelect:onEngineerSelect">
+            </select>
+        </div>
+
+        <input type="hidden" name="SupervisorName" id="SupervisorName" />
+        <input type="hidden" name="EngineerName" id="EngineerName" />
+
+        <div style="margin-bottom:10px">
+            <label style="display:inline-block;width:80px">生效日期：</label>
+            <input name="EffectiveDate" id="EffectiveDate" class="easyui-datebox" style="width:300px" required="true" />
+        </div>
+
+        <div style="margin-bottom:10px">
+            <label style="display:inline-block;width:80px">失效日期：</label>
+            <input name="ExpiryDate" id="ExpiryDate" class="easyui-datebox" style="width:300px" />
+        </div>
+
+        <div style="margin-bottom:10px">
+            <label>是否啟用：</label>
+            <input type="checkbox" name="IsActive" id="IsActive" /> 啟用
+        </div>
+    </form>
+</div>
+
+<div id="dlg-buttons" style="display:flex; justify-content:end">
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="saveRelation()">儲存</a>
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="$('#dlg').dialog('close')">取消</a>
+</div>
+
+@section Scripts {
+    <script src="~/Scripts/base/easyui/jquery.easyui.min.js"></script>
+    <script>
+        let engineerOptions = [];
+
+        $(function () {
+            // 載入工程師清單
+            $.ajax({
+                url: '@Url.Action("GetAllEngineers", "SupervisorEngineer")',
+                method: 'GET',
+                dataType: 'json',
+                async: false,
+                success: function (res) {
+                    if (res.success) {
+                        engineerOptions = res.data.map(e => ({
+                            EngineerNo: e.EngineerNo,
+                            EngineerName: e.EngineerName,
+                            display: `${e.EngineerNo} ${e.EngineerName}`
+                        }));
+                    }
+                }
+            });
+
+            // 初始化 DataGrid
+            $('#relationGrid').datagrid({
+                url: '@Url.Action("GetSupervisorEngineers", "SupervisorEngineer")',
+                method: 'get',
+                toolbar: '#toolbar',
+                fitColumns: true,
+                singleSelect: true,
+                loadFilter: function(response) {
+                    return {
+                        total: response.total,
+                        rows: response.rows
+                    };
+                },
+                onDblClickRow: function(index, row) {
+                    editDialog();
+                }
+            });
+        });
+
+        function formatActive(value) {
+            return value ? '<i class="fa fa-check" style="color:green;"></i>' : '<i class="fa fa-times" style="color:red;"></i>';
+        }
+
+        function openDialog() {
+            $('#dlg').dialog('open').dialog('setTitle', '新增關係');
+            $('#relationForm').form('clear');
+            $('#SupervisorNo').combobox('loadData', engineerOptions);
+            $('#EngineerNo').combobox('loadData', engineerOptions);
+            $('#IsActive').prop('checked', true);
+            $('#EffectiveDate').datebox('setValue', formatDate(new Date()));
+        }
+
+        function editDialog() {
+            const row = $('#relationGrid').datagrid('getSelected');
+            if (!row) {
+                $.messager.alert('提示', '請先選擇要編輯的記錄');
+                return;
+            }
+
+            $.ajax({
+                url: '@Url.Action("GetRelation", "SupervisorEngineer")',
+                method: 'GET',
+                dataType: 'json',
+                data: { id: row.Id },
+                success: function(response) {
+                    if (!response.success) {
+                        $.messager.alert('錯誤', '讀取資料失敗');
+                        return;
+                    }
+
+                    const data = response.data;
+                    $('#dlg').dialog('open').dialog('setTitle', '編輯關係');
+
+                    $('#SupervisorNo').combobox('loadData', engineerOptions);
+                    $('#EngineerNo').combobox('loadData', engineerOptions);
+
+                    $('#relationForm').form('load', {
+                        Id: data.Id,
+                        SupervisorNo: data.SupervisorNo,
+                        EngineerNo: data.EngineerNo,
+                        SupervisorName: data.SupervisorName,
+                        EngineerName: data.EngineerName,
+                        EffectiveDate: formatDate(data.EffectiveDate),
+                        ExpiryDate: data.ExpiryDate ? formatDate(data.ExpiryDate) : ''
+                    });
+
+                    $('#IsActive').prop('checked', data.IsActive);
+                }
+            });
+        }
+
+        function onSupervisorSelect(rec) {
+            $('#SupervisorName').val(rec.EngineerName);
+        }
+
+        function onEngineerSelect(rec) {
+            $('#EngineerName').val(rec.EngineerName);
+        }
+
+        function saveRelation() {
+            const formData = $('#relationForm').serializeArray();
+            const payload = {};
+            formData.forEach(f => {
+                payload[f.name] = f.value;
+            });
+
+            payload.IsActive = $('#IsActive').is(':checked');
+
+            // 驗證必填欄位
+            if (!payload.SupervisorNo || !payload.EngineerNo || !payload.EffectiveDate) {
+                $.messager.alert('提示', '請填寫必要欄位');
+                return;
+            }
+
+            $.ajax({
+                url: '@Url.Action("SaveRelation", "SupervisorEngineer")',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function(res) {
+                    if (res.success) {
+                        $('#dlg').dialog('close');
+                        $('#relationGrid').datagrid('reload');
+                    } else {
+                        $.messager.alert('錯誤', res.message || '儲存失敗');
+                    }
+                },
+                error: function() {
+                    $.messager.alert('錯誤', '儲存時發生錯誤');
+                }
+            });
+        }
+
+        function deleteRelation() {
+            const row = $('#relationGrid').datagrid('getSelected');
+            if (!row) {
+                $.messager.alert('提示', '請先選擇要刪除的記錄');
+                return;
+            }
+
+            $.messager.confirm('確認', '確定要刪除這筆記錄嗎？', function(ok) {
+                if (!ok) return;
+
+                $.ajax({
+                    url: '@Url.Action("DeleteRelation", "SupervisorEngineer")',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ id: row.Id }),
+                    success: function(res) {
+                        if (res.success) {
+                            $('#relationGrid').datagrid('reload');
+                        } else {
+                            $.messager.alert('錯誤', res.message || '刪除失敗');
+                        }
+                    },
+                    error: function() {
+                        $.messager.alert('錯誤', '刪除時發生錯誤');
+                    }
+                });
+            });
+        }
+
+
+        function formatDate(value) {
+            if (!value) return '';
+            // 處理 SQL Server 的 DateTime JSON 格式
+            const matches = /\/Date\((\d+)\)\//.exec(value);
+            if (matches) {
+                const date = new Date(parseInt(matches[1]));
+                const yyyy = date.getFullYear();
+                const mm = ('0' + (date.getMonth() + 1)).slice(-2);
+                const dd = ('0' + date.getDate()).slice(-2);
+                return `${yyyy}-${mm}-${dd}`;
+            }
+            // 處理一般 Date 物件
+            const date = new Date(value);
+            const yyyy = date.getFullYear();
+            const mm = ('0' + (date.getMonth() + 1)).slice(-2);
+            const dd = ('0' + date.getDate()).slice(-2);
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        function formatDateTime(value) {
+            if (!value) return '';
+            // 處理 SQL Server 的 DateTime JSON 格式
+            const matches = /\/Date\((\d+)\)\//.exec(value);
+            if (matches) {
+                const date = new Date(parseInt(matches[1]));
+                return date.toLocaleString();
+            }
+            // 處理一般 Date 物件
+            const date = new Date(value);
+            return date.toLocaleString();
+        }
+    </script>
+}

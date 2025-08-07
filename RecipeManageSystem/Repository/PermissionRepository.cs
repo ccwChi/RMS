@@ -99,7 +99,7 @@ namespace RecipeManageSystem.Repository
         {
             using (var conn = new SqlConnection(rmsString))
             {
-                return conn.Query<User>("SELECT UserNo, UserName, DepartmentName,Email, RoleId, IsActive, CreateDate FROM RMS.dbo.Users").ToList();
+                return conn.Query<User>("SELECT UserNo, UserName, DepartmentName,Email, RoleId, IsActive, ReciveAlarmFlag , CreateDate FROM RMS.dbo.Users").ToList();
             }
         }
 
@@ -107,7 +107,7 @@ namespace RecipeManageSystem.Repository
         {
             using (var conn = new SqlConnection(rmsString))
             {
-                return conn.Query<Role>("SELECT RoleId, RoleName, Description, Permissions, IsActive FROM RMS.dbo.Roles WHERE IsActive = 1").ToList();
+                return conn.Query<Role>("SELECT RoleId, RoleName, Description, Permissions, IsActive FROM RMS.dbo.Roles").ToList();
             }
         }
 
@@ -115,7 +115,7 @@ namespace RecipeManageSystem.Repository
         {
             using (var conn = new SqlConnection(rmsString))
             {
-                return conn.QueryFirstOrDefault<User>("SELECT UserNo, UserName, DepartmentName, RoleId, IsActive FROM RMS.dbo.Users WHERE UserNo = @userNo", new { userNo });
+                return conn.QueryFirstOrDefault<User>("SELECT UserNo, UserName, DepartmentName, RoleId, IsActive, ReciveAlarmFlag FROM RMS.dbo.Users WHERE UserNo = @userNo", new { userNo });
             }
         }
 
@@ -149,7 +149,7 @@ namespace RecipeManageSystem.Repository
         {
             using (var conn = new SqlConnection(rmsString))
             {
-                return conn.QueryFirstOrDefault<User>("SELECT UserNo, UserName, DepartmentName,Email, RoleId, IsActive FROM RMS.dbo.Users WHERE UserNo = @userNo", new { userNo });
+                return conn.QueryFirstOrDefault<User>("SELECT UserNo, UserName, DepartmentName,Email, RoleId, IsActive, ReciveAlarmFlag FROM RMS.dbo.Users WHERE UserNo = @userNo", new { userNo });
             }
         }
 
@@ -169,8 +169,8 @@ namespace RecipeManageSystem.Repository
             }
 
             const string sql = @"
-            INSERT INTO RMS.dbo.Users (UserNo, UserName, DepartmentName,Email, RoleId, IsActive, CreateDate, CreateBy)
-                        VALUES (@UserNo, @UserName, @DepartmentName,@Email, @RoleId, @IsActive, @CreateDate, @CreateBy);";
+            INSERT INTO RMS.dbo.Users (UserNo, UserName, DepartmentName,Email, RoleId, IsActive, ReciveAlarmFlag, CreateDate, CreateBy)
+                        VALUES (@UserNo, @UserName, @DepartmentName,@Email, @RoleId, @IsActive,@ReciveAlarmFlag, @CreateDate, @CreateBy);";
 
             try
             {
@@ -208,6 +208,7 @@ namespace RecipeManageSystem.Repository
                         Email          = @Email,
                         RoleId         = @RoleId,
                         IsActive       = @IsActive,
+                        ReciveAlarmFlag = @ReciveAlarmFlag,
                         UpdateDate     = @UpdateDate,
                         UpdateBy       = @UpdateBy
                     WHERE UserNo = @UserNo;";
@@ -226,5 +227,55 @@ namespace RecipeManageSystem.Repository
                 return false;
             }
         }
+
+
+        public bool DeleteUser(string userNo, string operatorUserNo)
+        {
+            using (var conn = new SqlConnection(rmsString))
+            {
+                conn.Open();
+                using (var tran = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        // 1. 記錄刪除日誌（可選）
+                        const string logSql = @"
+                    INSERT INTO RMS.dbo.UserOperationLog (OperationType, UserNo, OperatorUserNo, OperationDate, Remark)
+                    VALUES ('DELETE', @userNo, @operatorUserNo, GETDATE(), '刪除使用者')";
+
+                        // 如果沒有日誌表，可以註解掉這段
+                        /*
+                        conn.Execute(logSql, new 
+                        { 
+                            userNo = userNo,
+                            operatorUserNo = operatorUserNo
+                        }, tran);
+                        */
+
+                        // 2. 刪除使用者記錄
+                        const string deleteSql = @"DELETE FROM RMS.dbo.Users WHERE UserNo = @userNo";
+
+                        int rowsAffected = conn.Execute(deleteSql, new { userNo }, tran);
+
+                        if (rowsAffected > 0)
+                        {
+                            tran.Commit();
+                            return true;
+                        }
+                        else
+                        {
+                            tran.Rollback();
+                            return false;
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        tran.Rollback();
+                        return false;
+                    }
+                }
+            }
+        }
+
     }
 }

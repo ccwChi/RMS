@@ -52,10 +52,10 @@ namespace RecipeManageSystem.Controllers
 
 
         [HttpGet]
-        public JsonResult GetRecipes(string prodNo, string deviceName, string moldNo, int page = 1, int rows = 50)
+        public JsonResult GetRecipes(string prodNo, string deviceName, string moldNo, bool showAllVersions = false, int page = 1, int rows = 50)
         {
             // 1. 從 Repository 抓所有或條件後的列表
-            var all = _recipeManage.GetRecipes(prodNo, deviceName, moldNo);
+            var all = _recipeManage.GetRecipes(prodNo, deviceName, moldNo, showAllVersions);
 
             // 2. 分頁
             var paged = all.Skip((page - 1) * rows).Take(rows).ToList();

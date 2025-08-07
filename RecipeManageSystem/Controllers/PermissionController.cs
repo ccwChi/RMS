@@ -105,8 +105,8 @@ namespace RecipeManageSystem.Controllers
             return Json(new
             {
                 success = true,
-                count = RoleList.Count,  // EasyUI 會去讀 total，知道總共有幾筆
-                data = RoleList          // EasyUI 會去讀 rows，把它當作要在表格顯示的資料
+                count = RoleList.Count,  
+                data = RoleList         
             }, JsonRequestBehavior.AllowGet);
         }
 
@@ -145,6 +145,7 @@ namespace RecipeManageSystem.Controllers
                         RoleId = user.RoleId,
                         Email = user.Email,
                         IsActive = user.IsActive,
+                        ReciveAlarmFlag = user.ReciveAlarmFlag,
                         UpdateDate = DateTime.Now,
                         UpdateBy = operatorUserNo
                     };
@@ -164,6 +165,7 @@ namespace RecipeManageSystem.Controllers
                         Email = user.Email,
                         RoleId = user.RoleId,
                         IsActive = user.IsActive,
+                        ReciveAlarmFlag = user.ReciveAlarmFlag,
                         CreateDate = DateTime.Now,  
                         CreateBy = operatorUserNo   
                     };
@@ -196,6 +198,53 @@ namespace RecipeManageSystem.Controllers
         {
             var user = _permission.GetUser(userNo);
             return Json(new { success = true,  data = user }, JsonRequestBehavior.AllowGet);
+        }
+
+        [HttpPost]
+        [PermissionAuthorize(7)] // 使用與新增/編輯相同的權限
+        public JsonResult DeleteUser(string userNo)
+        {
+            try
+            {
+                // 1. 檢查必填參數
+                if (string.IsNullOrEmpty(userNo))
+                {
+                    return Json(new { success = false, message = "使用者工號不能為空" });
+                }
+
+                // 2. 檢查使用者是否存在
+                bool exists = _permission.ExistsUserByUserNo(userNo);
+                if (!exists)
+                {
+                    return Json(new { success = false, message = "找不到指定的使用者" });
+                }
+
+                // 3. 取得當前操作者資訊
+                var current = HttpContext.User as CustomPrincipal;
+                string operatorUserNo = current?.UserNo;
+
+                // 4. 防止自己刪除自己
+                if (userNo == operatorUserNo)
+                {
+                    return Json(new { success = false, message = "不能刪除自己的帳號" });
+                }
+
+                // 5. 執行刪除
+                bool result = _permission.DeleteUser(userNo, operatorUserNo);
+
+                if (result)
+                {
+                    return Json(new { success = true, message = "使用者已成功刪除" });
+                }
+                else
+                {
+                    return Json(new { success = false, message = "刪除失敗，請稍後再試" });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "刪除時發生錯誤：" + ex.Message });
+            }
         }
 
     }

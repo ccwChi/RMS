@@ -199,31 +199,35 @@ namespace RecipeManageSystem.Repository
             new { RecipeId = recipeId, Op = op, User = user }, tran);
         }
 
-        public List<RecipeTotalDto> GetRecipes(string prodNo, string deviceName, string moldNo)
+        public List<RecipeTotalDto> GetRecipes(string prodNo, string deviceName, string moldNo, bool showAllVersions = false)
         {
             using (var conn = new SqlConnection(mesString))
             {
-                var sql = @"
-                    SELECT 
-                      h.RecipeId,
-                      h.ProdNo,
-                      h.ProdName,
-                      h.MaterialNo,
-                      h.DeviceId,
-                      m.DeviceName,
-                      h.MoldNo,
-                      h.CreateBy,
-                      h.CreateDate,
-                      h.Version,
-                      h.IsActive,
-                      h.Remark
-                    FROM RMS.dbo.RecipeHeader h
-                    LEFT JOIN dbo.MES_MACHINE m ON h.DeviceId = m.DeviceID and m.StateFlag = 'Y'
-                    WHERE (@prodNo IS NULL OR h.ProdNo LIKE '%'+@prodNo+'%')
-                      AND (@deviceName IS NULL OR m.DeviceName LIKE '%'+@deviceName+'%')
-                      AND (@moldNo IS NULL OR h.MoldNo LIKE '%'+@moldNo+'%')
-                      AND m.Plant in ('1101', '1103')
-                    ORDER BY h.CreateDate DESC, h.DeviceId, h.ProdNo, h.MoldNo, h.MaterialNo;";
+                // 根據 showAllVersions 參數決定是否要過濾 IsActive
+                var whereClause = showAllVersions ? "" : "AND h.IsActive = 1";
+
+                var sql = $@"
+                        SELECT 
+                          h.RecipeId,
+                          h.ProdNo,
+                          h.ProdName,
+                          h.MaterialNo,
+                          h.DeviceId,
+                          m.DeviceName,
+                          h.MoldNo,
+                          h.CreateBy,
+                          h.CreateDate,
+                          h.Version,
+                          h.IsActive,
+                          h.Remark
+                        FROM RMS.dbo.RecipeHeader h
+                        LEFT JOIN dbo.MES_MACHINE m ON h.DeviceId = m.DeviceID and m.StateFlag = 'Y'
+                        WHERE (@prodNo IS NULL OR h.ProdNo LIKE '%'+@prodNo+'%')
+                          AND (@deviceName IS NULL OR m.DeviceName LIKE '%'+@deviceName+'%')
+                          AND (@moldNo IS NULL OR h.MoldNo LIKE '%'+@moldNo+'%')
+                          AND m.Plant in ('1101', '1103')
+                          {whereClause}
+                        ORDER BY h.CreateDate DESC, h.DeviceId, h.ProdNo, h.MoldNo, h.MaterialNo, h.Version DESC;";
 
                 return conn.Query<RecipeTotalDto>(
                     sql,
@@ -307,32 +311,32 @@ namespace RecipeManageSystem.Repository
             {
                 conn.Open();
 
-                // 1. 先取得該機台所有應該有的參數定義
+                // 1. 先取得該機台目前應該有的參數定義
                 const string sqlMachineParams = @"
-                    SELECT 
-                        p.ParamId, p.ParamName, p.Unit, p.SectionCode, p.SequenceNo, p.IsActive
-                    FROM RMS.dbo.MachineParameter mp
-                    JOIN RMS.dbo.Parameter p ON mp.ParamId = p.ParamId
-                    WHERE mp.DeviceId = @deviceId
-                    ORDER BY p.SectionCode, p.SequenceNo, p.ParamName";
+            SELECT 
+                p.ParamId, p.ParamName, p.Unit, p.SectionCode, p.SequenceNo, p.IsActive
+            FROM RMS.dbo.MachineParameter mp
+            JOIN RMS.dbo.Parameter p ON mp.ParamId = p.ParamId
+            WHERE mp.DeviceId = @deviceId
+            ORDER BY p.SectionCode, p.SequenceNo, p.ParamName";
 
-                var machineParams = conn.Query<RecipeDetailDto>(sqlMachineParams, new { deviceId }).ToList();
+                var currentMachineParams = conn.Query<RecipeDetailDto>(sqlMachineParams, new { deviceId }).ToList();
 
                 // 2. 查詢是否有既有的Recipe版本
                 const string sqlVersions = @"
-                    SELECT 
-                      h.RecipeId, h.Version, h.ProdNo, h.MaterialNo, h.MoldNo, h.DeviceId, h.Remark,
-                      h.CreateBy, h.CreateDate, h.IsActive, h.UpdateBy, h.UpdateDate,
-                      d.ParamId, d.StdValue, d.MaxValue, d.MinValue, d.BiasMethod, d.BiasValue, d.AlarmFlag,
-                      p.ParamName
-                    FROM RMS.dbo.RecipeHeader h
-                    LEFT JOIN RMS.dbo.RecipeDetail d ON h.RecipeId = d.RecipeId
-                    LEFT JOIN RMS.dbo.Parameter p ON d.ParamId = p.ParamId
-                    WHERE h.DeviceId = @deviceId
-                      AND h.ProdNo = @prodNo
-                      AND (@materialNo = '' OR h.MaterialNo = @materialNo)
-                      AND (@moldNo = '' OR h.MoldNo = @moldNo)
-                    ORDER BY h.Version DESC";
+            SELECT 
+              h.RecipeId, h.Version, h.ProdNo, h.MaterialNo, h.MoldNo, h.DeviceId, h.Remark,
+              h.CreateBy, h.CreateDate, h.IsActive, h.UpdateBy, h.UpdateDate,
+              d.ParamId, d.StdValue, d.MaxValue, d.MinValue, d.BiasMethod, d.BiasValue, d.AlarmFlag,
+              p.ParamName, p.Unit, p.SectionCode, p.SequenceNo, p.IsActive as ParamIsActive
+            FROM RMS.dbo.RecipeHeader h
+            LEFT JOIN RMS.dbo.RecipeDetail d ON h.RecipeId = d.RecipeId
+            LEFT JOIN RMS.dbo.Parameter p ON d.ParamId = p.ParamId
+            WHERE h.DeviceId = @deviceId
+              AND h.ProdNo = @prodNo
+              AND (@materialNo = '' OR h.MaterialNo = @materialNo)
+              AND (@moldNo = '' OR h.MoldNo = @moldNo)
+            ORDER BY h.Version DESC";
 
                 var lookup = new Dictionary<int, RecipeVersionDto>();
 
@@ -378,7 +382,7 @@ namespace RecipeManageSystem.Repository
                 .AsQueryable()
                 .ToList();
 
-                // 4. 如果有既有版本，需要補齊缺少的參數
+                // 4. 如果有既有版本，處理參數合併邏輯
                 if (lookup.Count > 0)
                 {
                     foreach (var version in lookup.Values)
@@ -386,19 +390,20 @@ namespace RecipeManageSystem.Repository
                         // 建立完整的參數清單
                         var completeParams = new List<RecipeDetailDto>();
 
-                        foreach (var machineParam in machineParams)
+                        // 首先加入所有已經設定過的參數（保持原有順序和資料）
+                        var existingParamIds = new HashSet<int>();
+                        foreach (var existingParam in version.Params)
                         {
-                            // 查看這個參數是否已經在Recipe中有設定
-                            var existingParam = version.Params.FirstOrDefault(p => p.ParamId == machineParam.ParamId);
+                            completeParams.Add(existingParam);
+                            existingParamIds.Add(existingParam.ParamId);
+                        }
 
-                            if (existingParam != null)
+                        // 然後檢查機台目前的參數定義，補上新增的參數
+                        foreach (var machineParam in currentMachineParams)
+                        {
+                            // 如果這個參數在既有設定中沒有，就新增一個空的參數項目
+                            if (!existingParamIds.Contains(machineParam.ParamId))
                             {
-                                // 已有設定，使用既有值
-                                completeParams.Add(existingParam);
-                            }
-                            else
-                            {
-                                // 沒有設定，建立空的參數項目
                                 completeParams.Add(new RecipeDetailDto
                                 {
                                     ParamId = machineParam.ParamId,
@@ -412,6 +417,19 @@ namespace RecipeManageSystem.Repository
                                 });
                             }
                         }
+
+                        // 可選：按照 SectionCode, SequenceNo, ParamName 重新排序
+                        // 如果你希望保持某種順序的話
+                        completeParams = completeParams
+                            .OrderBy(p => {
+                                var machineParam = currentMachineParams.FirstOrDefault(mp => mp.ParamId == p.ParamId);
+                                return machineParam?.ParamName ?? "ZZZ"; // 不在機台定義中的參數排到最後
+                            })
+                            .ThenBy(p => {
+                                var machineParam = currentMachineParams.FirstOrDefault(mp => mp.ParamId == p.ParamId);
+                                return machineParam?.ParamId ?? 9999;
+                            })
+                            .ToList();
 
                         // 更新為完整的參數清單
                         version.Params = completeParams;
@@ -435,7 +453,7 @@ namespace RecipeManageSystem.Repository
                     UpdateDate = null,
                     CreateBy = null,
                     CreateDate = DateTime.Now,
-                    Params = machineParams.Select(p => new RecipeDetailDto
+                    Params = currentMachineParams.Select(p => new RecipeDetailDto
                     {
                         ParamId = p.ParamId,
                         ParamName = p.ParamName,

@@ -18,7 +18,8 @@
             <th data-options="field:'DepartmentName',width:100,align:'left'">部門</th>
             <th data-options="field:'Email',width:100,align:'left'">信箱</th>
             <th data-options="field:'RoleId',width:80,align:'left',formatter:formatRole">權限角色</th>
-            <th data-options="field:'IsActive',width:60,align:'center',formatter:formatActive">是否啟用</th>
+            <th data-options="field:'IsActive',width:40,align:'center',formatter:formatActive">是否啟用</th>
+            <th data-options="field:'ReciveAlarmFlag',width:40,align:'center',formatter:formatActive">是否收到警報</th>
             <th data-options="field:'Opt',width:60,align:'center',formatter:formatActive">編輯</th>
         </tr>
     </thead>
@@ -26,6 +27,11 @@
 
 <div id="toolbar" style="padding:5px; display:flex; align-items:center">
     <a href="javascript:void(0)" class="custom-easyui-button" onclick="openUserDialog()">新增</a>
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="editSelectedUser()">編輯</a>
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="deleteSelectedUser()">刪除</a>
+    <span style="margin-left: 20px; color: #666; font-size: 12px;">
+        <i class="fa fa-info-circle"></i> 提示：雙擊列表項目可直接編輯;    有登入的人皆可觀看全部，但只有群組權限的人能做特定編輯。
+    </span>
 </div>
 
 <!-- 新增／編輯 Dialog -->
@@ -34,7 +40,8 @@
         <!-- 只留一個 combobox，讓使用者從「全體員工」裡選一筆 -->
         <div style="margin-bottom:10px">
             <label>選擇員工：</label>
-            <select id="EmployeeSelect"  class="easyui-combobox" style="width:100%" name="UserNo"></select>
+            <select id="EmployeeSelect" class="easyui-combobox" style="width:100%" name="UserNo"
+                    data-options="prompt:'請輸入工號或姓名搜尋...'"></select>
 
         </div>
 
@@ -45,15 +52,23 @@
 
         <!-- 接著再選「角色」和「是否啟用」 -->
         <div style="margin-bottom:10px">
-            <label>權限角色：</label>
+            <label>群組：</label>
             <select name="RoleId" id="RoleId" class="easyui-combobox" style="width:100%;"
                     data-options="valueField:'id', textField:'name', panelHeight:'auto'">
                 <!-- 程式碼裡用 loadData(roleOptions) 載入 -->
             </select>
         </div>
-        <div style="margin-bottom:10px">
-            <label>是否啟用：</label>
-            <input type="checkbox" name="IsActive" id="IsActive" /> 啟用
+        <div style="margin-bottom:15px">
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">啟用狀態：</label>
+            <label style="cursor:pointer;">
+                <input type="checkbox" name="IsActive" id="IsActive" style="margin-right:5px;" />
+                是否能夠擁有對應群組編輯權限
+            </label>
+            <label style="display:block; margin-bottom:5px; font-weight:bold;">警報發送：</label>
+            <label style="cursor:pointer;">
+                <input type="checkbox" name="ReciveAlarmFlag" id="ReciveAlarmFlag" style="margin-right:5px;" />
+                是否接受警報發送
+            </label>
         </div>
     </form>
 </div>
@@ -68,6 +83,7 @@
         // 全域儲存：角色清單 & 公司全體員工清單
         let roleOptions = [];
         let employeeOptions = [];
+        let isEditMode = false;
 
         $(function () {
             // 1. 先同步抓取「所有角色列表」
@@ -99,10 +115,8 @@
                 async: false,
                 success: function (res) {
                     if (res.success) {
-                        // 假設 res.data = [ { UserNo, UserName, DepartmentName }, ... ]
                         employeeOptions = res.data.map(u => ({
                             value: u.UserNo,
-                            // text 可以放「工號 姓名 部門」，讓下拉列表看得一目了然，filter 也能模糊匹配
                             text:  `${u.UserNo}　${u.UserName}　(${u.DepartmentName})`,
                             UserName:  u.UserName,
                             Email: u.Email,
@@ -124,10 +138,11 @@
                 toolbar: '#toolbar',
                 fitColumns: true,
                 singleSelect: true,
+                panelHeight: '350',
                 loadFilter: function(response) {
                     return {
-                        total: response.total,
-                        rows:   response.rows
+                        total: response.rows ? response.rows.length : 0,
+                        rows: response.rows || []
                     };
                 },
                 columns: [[
@@ -135,9 +150,17 @@
                     { field: 'UserName', title: '名稱', width: 80, align: 'left' },
                     { field: 'DepartmentName', title: '部門', width: 100, align: 'left' },
                     { field: 'Email', title: '信箱', width: 120, align: 'left' },
-                    { field: 'RoleId', title: '權限角色', width: 80, align: 'left', formatter: formatRole },
+                    { field: 'RoleId', title: '群組', width: 80, align: 'left', formatter: formatRole },
                     {
                         field: 'IsActive', title: '是否啟用', width: 80, align: 'center',
+                        formatter: function (v) {
+                            return v
+                                ? '<i class="fa fa-check" style="color:green;"></i>'
+                                : '<i class="fa fa-times" style="color:red;"></i>';
+                        }
+                    },
+                    {
+                        field: 'ReciveAlarmFlag', title: '是否發送警報', width: 80, align: 'center',
                         formatter: function (v) {
                             return v
                                 ? '<i class="fa fa-check" style="color:green;"></i>'
@@ -153,21 +176,43 @@
                             return `<a href="javascript:void(0)" onclick="editUserRow(${index})">編輯</a>`;
                         }
                     }
-                ]]
+                ]],
+                onDblClickRow: function (index, row) {
+                    editUserRow(index);
+                },
             });
         });
 
         function editUserRow(index) {
             $('#userGrid').datagrid('selectRow', index);
-            editUserDialog();
+            const row = $('#userGrid').datagrid('getSelected');
+            editUserDialog(row);
         }
+
+        function deleteUserRow(index) {
+            $('#userGrid').datagrid('selectRow', index);
+            deleteSelectedUser();
+        }
+
 
         // 格式化：把 RoleId 轉成人可讀的 RoleName
         function formatRole(value, row, index) {
-            if (!value) return '';
+            if (!value) return '<span style="color:#999;">未設定</span>';
             const id = value.toString();
             const role = roleOptions.find(x => x.id.toString() === id);
-            return role ? role.name : '';
+            return role ? role.name : '<span style="color:#999;">角色不存在</span>';
+        }
+
+        // 格式化操作欄
+        function formatOperations(value, row, index) {
+            return `
+                <a href="javascript:void(0)" onclick="editUserRow(${index})" title="編輯">
+                    <i class="fa fa-edit" style="color:#337ab7;"></i>
+                </a>
+                <a href="javascript:void(0)" onclick="deleteUserRow(${index})" title="刪除" style="margin-left:10px;">
+                    <i class="fa fa-trash" style="color:#d9534f;"></i>
+                </a>
+            `;
         }
 
         // 格式化：IsActive → 綠色勾勾 or 空白
@@ -177,63 +222,104 @@
                 : '';
         }
 
-        // 開啟「新增使用者」Dialog
-        function openUserDialog() {
-
-            $('#userDlg').dialog('open').dialog('setTitle', '新增使用者');
-            $('#userForm').form('clear');
-
-            // 1. 「員工下拉」用純 JS 方式初始化
-            $('#EmployeeSelect').combobox({
-                data: employeeOptions,          // 直接把整個陣列傳進去
-                valueField: 'value',            // 物件中的 value 欄位作為 combobox 的值
-                textField: 'text',              // 物件中的 text 欄位作為 combobox 顯示文字
-                panelHeight: '250',            // 自動高度
-                filter: function (q, row) {
-                    // q = 使用者目前在輸入框輸的文字
-                    // row.text = 該筆項目完整顯示文字 (例如 "A001 王小明 (資訊部)")
-                    return row.text.indexOf(q) >= 0;
-                },
-                onSelect: function (rec) {
-                    // 當使用者選定某筆後，rec.UserName / rec.DepartmentName 就是該筆的資料
-                    $('#UserName').val(rec.UserName);
-                    $('#DepartmentName').val(rec.DepartmentName);
-                    $('#Email').val(rec.Email);
+        // 刪除使用者
+        function deleteUser(row) {
+            $.messager.confirm('確認刪除',
+                `確定要刪除使用者「${row.UserName}」（工號：${row.UserNo}）嗎？<br/><span style="color:red;">此操作無法復原！</span>`,
+                function(r) {
+                    if (r) {
+                        $.ajax({
+                            url: '@Url.Action("DeleteUser", "Permission")',
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ UserNo: row.UserNo }),
+                            success: function (res) {
+                                if (res.success) {
+                                    $.messager.show({
+                                        title: '成功',
+                                        msg: '使用者已刪除',
+                                        timeout: 2000,
+                                        showType: 'slide'
+                                    });
+                                    $('#userGrid').datagrid('reload');
+                                } else {
+                                    $.messager.alert('錯誤', res.message || '刪除失敗');
+                                }
+                            },
+                            error: function () {
+                                $.messager.alert('錯誤', '刪除時發生錯誤');
+                            }
+                        });
+                    }
                 }
-            });
-            // 2. 清空 combobox 的預設選擇（若從編輯頁面繼承過來，務必先 clear）
-            $('#EmployeeSelect').combobox('clear');
-
-            // 3. 初始化「角色下拉」
-            $('#RoleId').combobox({
-                data: roleOptions,     // 先前已經用 AJAX 抓到的角色清單
-                valueField: 'id',
-                textField: 'name',
-                panelHeight: 'auto'
-            });
-            $('#RoleId').combobox('clear');
-
-            // 4. 隱藏欄位先空值
-            $('#UserName').val('');
-            $('#DepartmentName').val('');
-
-            // 5. 預設「是否啟用」打勾
-            $('#IsActive').prop('checked', true);
+            );
         }
 
+        // 編輯選中的使用者
+        function editSelectedUser() {
+            const row = $('#userGrid').datagrid('getSelected');
+            if (!row) {
+                $.messager.alert('提示', '請先選擇要編輯的使用者');
+                return;
+            }
+            editUserDialog(row); // 傳遞 row 參數
+        }
 
-        // 開啟「編輯使用者」Dialog
-function editUserDialog() {
-    const row = $('#userGrid').datagrid('getSelected');
+function openUserDialog() {
+    $('#userDlg').dialog('open').dialog('setTitle', '新增使用者');
+    $('#userForm').form('clear');
+
+    // 1. 「員工下拉」用純 JS 方式初始化（新增模式不禁用）
+    $('#EmployeeSelect').combobox({
+        data: employeeOptions,
+        valueField: 'value',
+        textField: 'text',
+        panelHeight: '250',
+        disabled: false, // 新增模式啟用
+        filter: function (q, row) {
+            return row.text.indexOf(q) >= 0;
+        },
+        onSelect: function (rec) {
+            $('#UserName').val(rec.UserName);
+            $('#DepartmentName').val(rec.DepartmentName);
+            $('#Email').val(rec.Email);
+        }
+    });
+
+    // 2. 清空 combobox 的預設選擇
+    $('#EmployeeSelect').combobox('clear');
+
+    // 3. 初始化「角色下拉」
+    $('#RoleId').combobox({
+        data: roleOptions,
+        valueField: 'id',
+        textField: 'name',
+        panelHeight: '300'
+    });
+    $('#RoleId').combobox('clear');
+
+    // 4. 隱藏欄位先空值
+    $('#UserName').val('');
+    $('#DepartmentName').val('');
+    $('#Email').val('');
+
+    // 5. 預設「是否啟用」打勾
+    $('#IsActive').prop('checked', true);
+    $('#ReciveAlarmFlag').prop('checked', false); // 新增這行
+}
+
+// 開啟「編輯使用者」Dialog - 修改為接受參數
+function editUserDialog(row) {
     if (!row) {
         alert('請先選擇要編輯的使用者');
         return;
     }
+
     $.ajax({
         url: '@Url.Action("GetUser", "Permission")',
         method: 'GET',
         dataType: 'json',
-        data: { userNo: row.UserNo },   
+        data: { userNo: row.UserNo },
         success: function(response) {
             if (!response.success) {
                 alert('讀取使用者資料失敗');
@@ -242,12 +328,13 @@ function editUserDialog() {
             const userObj = response.data;
             $('#userDlg').dialog('open').dialog('setTitle', '編輯使用者');
 
-            // 1. 初始化員工下拉
+            // 1. 初始化員工下拉（編輯模式下禁用）
             $('#EmployeeSelect').combobox({
                 data: employeeOptions,
                 valueField: 'value',
                 textField: 'text',
-                panelHeight: 'auto',
+                panelHeight: '250',
+                disabled: true, // 編輯模式下禁用
                 filter: function(q, row) {
                     return row.text.indexOf(q) >= 0;
                 },
@@ -256,15 +343,15 @@ function editUserDialog() {
                     $('#DepartmentName').val(rec.DepartmentName);
                 }
             });
+
             // 2. 把當前使用者設為 combobox 選值
             const matched = employeeOptions.find(x => x.value === userObj.UserNo);
             if (matched) {
                 $('#EmployeeSelect').combobox('setValue', matched.value);
                 $('#UserName').val(matched.UserName);
                 $('#DepartmentName').val(matched.DepartmentName);
+                $('#Email').val(matched.Email);
             }
-            // （若不允許編輯工號，就做 disable）
-            // $('#EmployeeSelect').combobox('disable');
 
             // 3. 初始化角色下拉並設值
             $('#RoleId').combobox({
@@ -277,6 +364,7 @@ function editUserDialog() {
 
             // 4. 設定 IsActive
             $('#IsActive').prop('checked', !!userObj.IsActive);
+            $('#ReciveAlarmFlag').prop('checked', !!userObj.ReciveAlarmFlag);
         },
         error: function() {
             alert('讀取使用者資料失敗');
@@ -286,51 +374,76 @@ function editUserDialog() {
 
 
         // 儲存使用者（新增 or 更新）
-        function saveUser() {
-            // 1. 先把 UserNo、RoleId、IsActive 從畫面取出
-            //    由於 combobox name="UserNo"，serializeArray() 會拿到 UserNo
-            const formData = $('#userForm').serializeArray();
-            console.log("formData", formData)
-            const payload = {};
-            formData.forEach(f => {
-                payload[f.name] = f.value;
-            });
-            // UserName、DepartmentName 是隱藏欄位
-            payload.UserName       = $('#UserName').val(); 
-            payload.Email          = $('#Email').val();
-            payload.DepartmentName = $('#DepartmentName').val();
-            payload.IsActive       = $('#IsActive').is(':checked');
+function saveUser() {
+   // 1. 驗證必填欄位
+   const userNo = $('#EmployeeSelect').combobox('getValue');
+   const roleId = $('#RoleId').combobox('getValue');
 
-            // 2. 確認必填：UserNo、UserName、RoleId
-            if (!payload.UserNo) {
-                alert('請先從「選擇員工」下拉選擇一位員工');
-                return;
-            }
-            if (!payload.RoleId) {
-                alert('請選擇「角色」');
-                return;
-            }
+   if (!userNo) {
+       $.messager.alert('提示', '請選擇員工');
+       return;
+   }
+   if (!roleId) {
+       $.messager.alert('提示', '請選擇權限角色');
+       return;
+   }
 
-            console.log("payload",payload)
-            $.ajax({
-                url: '@Url.Action("SaveUser", "Permission")',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify(payload),
-                success: function (res) {
-                    if (res.success) {
-                        $('#userDlg').dialog('close');
-                        $('#userGrid').datagrid('reload');
-                    } else {
-                        alert(res.message || '儲存失敗');
-                    }
-                },
-                error: function () {
-                    alert('儲存使用者時發生錯誤');
-                }
-            });
+   // 2. 收集表單資料
+   const payload = {
+       UserNo: userNo,
+       UserName: $('#UserName').val(),
+       Email: $('#Email').val(),
+       DepartmentName: $('#DepartmentName').val(),
+       RoleId: roleId,
+       IsActive: $('#IsActive').is(':checked'),
+       ReciveAlarmFlag: $('#ReciveAlarmFlag').is(':checked')
+   };
+
+   console.log("儲存資料:", payload);
+
+   // 3. 顯示載入狀態
+   const $saveBtn = $('#userDlg-buttons .custom-easyui-button:first');
+   const originalText = $saveBtn.html();
+   $saveBtn.html('<i class="fa fa-spinner fa-spin"></i> 儲存中...').css('pointer-events', 'none');
+        
+   // 4. 發送請求
+           $.ajax({
+               url: '@Url.Action("SaveUser", "Permission")',
+               type: 'POST',
+               contentType: 'application/json',
+               data: JSON.stringify(payload),
+               success: function (res) {
+                   if (res.success) {
+                       $.messager.show({
+                           title: '成功',
+                           msg: res.message || '儲存成功',
+                           timeout: 3000,
+                           showType: 'slide'
+                       });
+                       $('#userDlg').dialog('close');
+                       $('#userGrid').datagrid('reload');
+                   } else {
+                       $.messager.alert('錯誤', res.message || '儲存失敗');
+                   }
+               },
+               error: function () {
+                   $.messager.alert('錯誤', '儲存使用者時發生錯誤');
+               },
+               complete: function() {
+                   // 恢復按鈕狀態
+                   $saveBtn.html(originalText).css('pointer-events', '');
+               }
+           });
         }
 
+        function deleteSelectedUser() {
+            const row = $('#userGrid').datagrid('getSelected');
+            if (!row) {
+                $.messager.alert('提示', '請先選擇要刪除的使用者');
+                return;
+            }
+            deleteUser(row);
+        }
         // 刪除使用者
         function deleteUser() {
             const row = $('#userGrid').datagrid('getSelected');

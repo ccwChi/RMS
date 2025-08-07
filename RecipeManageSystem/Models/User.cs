@@ -17,6 +17,7 @@ namespace RecipeManageSystem.Models
 
         public string RoleId { get; set; }
         public bool IsActive { get; set; }
+        public bool ReciveAlarmFlag { get; set; }
         public DateTime? ExpirationDate { get; set; }
         public DateTime? CreateDate { get; set; }
         public string CreateBy { get; set; }

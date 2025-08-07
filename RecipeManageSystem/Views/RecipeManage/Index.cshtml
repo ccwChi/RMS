@@ -23,7 +23,6 @@
                        " />
             </div>
             <div style="display:flex; gap:10px">
-
                 <div style="display: flex; gap: 5px; align-items: center; margin-bottom: 8px;">
                     <label style="width: 50px; display: inline-block; font-weight: bold;">料號：</label>
                     <input id="filterProdNo" class="easyui-combobox" style="width:150px"
@@ -50,17 +49,22 @@
                        " />
                 </div>
             </div>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <div href="javascript:void(0)" class="custom-easyui-button" onclick="applyFilters()">搜尋</div>
-                <div href="javascript:void(0)" class="custom-easyui-button" onclick="clearFilters()">清除</div>
-                <div href="javascript:void(0)" class="custom-easyui-button" onclick="createNewRecipe()">新增</div>
+            <div style="display:flex; justify-content:space-between; align-items:center">
+                <div style="display: flex; gap: 10px; align-items: baseline;">
+                    <div href="javascript:void(0)" class="custom-easyui-button" onclick="applyFilters()">搜尋</div>
+                    <div href="javascript:void(0)" class="custom-easyui-button" onclick="clearFilters()">清除</div>
+                    <div href="javascript:void(0)" class="custom-easyui-button" onclick="createNewRecipe()">新增</div>
+
+                </div>
+                <div style="display: flex; gap: 10px; align-items: baseline;">
+                    <input type="checkbox" id="showAllVersions" onchange="onShowAllVersionsChange()" />
+                    <label for="showAllVersions" style="font-weight: bold; cursor: pointer;">顯示全版本</label>
+                </div>
             </div>
         </div>
 
         <!-- Recipe 清單 -->
         <div style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
-
-
             <table id="recipeGrid" class="easyui-datagrid" style="width:100%; height: 100%;"
                    data-options="
                  url:'@Url.Action("GetRecipes", "RecipeManage")',
@@ -94,8 +98,7 @@
         <!-- 空白狀態 -->
         <div id="emptyState" style="text-align: center; color: #666; padding: 80px 20px; background: #fafafa; border: 1px dashed #ddd; border-radius: 5px; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center;">
             <h3 style="color: #999; margin-bottom: 10px;">請從左側選擇一個參數配置</h3>
-            <p>選擇現有配置進行查看或編輯
-<br />或點擊「新增」建立新的參數配置</p>
+            <p>選擇現有配置進行查看或編輯<br />或點擊「新增」建立新的參數配置</p>
         </div>
 
         <!-- 編輯面板 -->
@@ -117,25 +120,33 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 10px;">
+                    <!-- 版本下拉選擇 -->
                     <div style="display: flex; align-items: baseline; gap: 5px;">
                         <label style="font-weight: bold; color: #333;">版本：</label>
-                        <span id="displayVersion" style="font-weight: bold;">v1</span>
+                        <input id="versionSelect" class="easyui-combobox" style="width:120px;"
+                               data-options="
+                                 valueField:'RecipeId',
+                                 textField:'VersionDisplay',
+                                 panelHeight:'auto',
+                                 editable:false,
+                                 onSelect:onVersionSelect
+                               " />
                     </div>
                     <div style="display: flex; align-items: baseline; gap: 5px; flex: 1;">
                         <label style="font-weight: bold; color: #333;">備註：</label>
                         <input id="editRemark" class="easyui-textbox" style="width:250px;"
                                data-options="prompt:'輸入備註資訊...'" />
                     </div>
-                    <div style="display: flex; align-items: baseline; gap: 5px;">
-                        <label for="editIsActive" style="font-weight: bold; color: #333;">是否啟用:</label>
-                        <input type="checkbox" id="editIsActive" />
-                    </div>
                 </div>
-                <div style="display: flex; gap: 20px; align-items: baseline; ">
+                <div style="display: flex; gap: 20px; align-items: baseline; justify-content:space-between ">
                     <div style="display: flex; align-items: center; gap: 5px;">
                         <span id="versionUpdateInfo" style="color: #888; font-size: 12px;">
                             <i class="fa fa-clock-o"></i> 最後更新：載入中...
                         </span>
+                    </div>
+                    <div style="display: flex; align-items: baseline; gap: 5px;">
+                        <label for="editIsActive" style="font-weight: bold; color: #333;">是否啟用:</label>
+                        <input type="checkbox" id="editIsActive" onchange="onActiveStatusChange()" />
                     </div>
                 </div>
             </div>
@@ -171,7 +182,6 @@
                 </div>
             </div>
 
-
             <!-- 操作按鈕區 -->
             <div style="justify-content:end; margin-top: 5px; display:flex; width:100%">
                 <div href="javascript:void(0)" class="custom-easyui-button" onclick="saveRecipe('save')" id="saveBtn">
@@ -202,6 +212,7 @@
         let currentProdNo = '';
         let currentMoldNo = '';
         let isSaving = false; // 防止重複送出
+        let showAllVersions = false; // 是否顯示所有版本
         const editableFields = ['StdValue', 'MaxValue', 'MinValue', 'BiasMethod', 'BiasValue'];
 
         // 偏差方式選項
@@ -217,12 +228,20 @@
             // 添加 CSS 動畫
             if ($('head style[data-recipe-styles]').length === 0) {
                 $('head').append(`
-                            <style data-recipe-styles>
-                                @@keyframes spin {
-                                    to { transform: rotate(360deg); }
-                                }
-                            </style>
-                        `);
+                    <style data-recipe-styles>
+                        @@keyframes spin {
+                            to { transform: rotate(360deg); }
+                        }
+                        .version-active {
+                            background-color: #d4edda !important;
+                            font-weight: bold;
+                        }
+                        .version-inactive {
+                            background-color: #f8d7da !important;
+                            color: #721c24;
+                        }
+                    </style>
+                `);
             }
         });
 
@@ -241,9 +260,15 @@
             });
         }
 
-        // 載入初始Recipe清單（全部）
+        // 載入初始Recipe清單（預設只顯示啟用版本）
         function loadInitialRecipeList() {
-            $('#recipeGrid').datagrid('load', {});
+            $('#recipeGrid').datagrid('load', { showAllVersions: false });
+        }
+
+        // 顯示所有版本的切換事件
+        function onShowAllVersionsChange() {
+            showAllVersions = $('#showAllVersions').is(':checked');
+            applyFilters();
         }
 
         // 機台選擇事件
@@ -306,9 +331,10 @@
             const filters = {
                 deviceName: $('#filterMachine').combobox('getText'),
                 prodNo: $('#filterProdNo').combobox('getValue'),
-                moldNo: $('#filterMoldNo').combobox('getValue')
+                moldNo: $('#filterMoldNo').combobox('getValue'),
+                showAllVersions: showAllVersions
             };
-
+            console.log({filters})
             $('#recipeGrid').datagrid('load', filters);
         }
 
@@ -317,10 +343,12 @@
             $('#filterMachine').combobox('clear');
             $('#filterProdNo').combobox('clear').combobox('disable');
             $('#filterMoldNo').combobox('clear').combobox('disable');
+            $('#showAllVersions').prop('checked', false);
+            showAllVersions = false;
             currentDeviceId = '';
             currentProdNo = '';
             currentMoldNo = '';
-            $('#recipeGrid').datagrid('load', {});
+            $('#recipeGrid').datagrid('load', { showAllVersions: false });
         }
 
         // Recipe清單載入完成
@@ -342,11 +370,11 @@
 
         // 選擇Recipe事件
         function onRecipeSelect(index, row) {
-            loadRecipeVersions(row.DeviceId, row.ProdNo, row.MaterialNo || '', row.MoldNo || '');
+            loadRecipeVersions(row.DeviceId, row.ProdNo, row.MaterialNo || '', row.MoldNo || '', row.RecipeId);
         }
 
         // 載入Recipe版本資料
-        function loadRecipeVersions(deviceId, prodNo, materialNo, moldNo) {
+        function loadRecipeVersions(deviceId, prodNo, materialNo, moldNo, selectedRecipeId = null) {
             $.get('@Url.Action("GetDetailToEdit", "RecipeManage")', {
                 deviceId: deviceId,
                 prodNo: prodNo,
@@ -356,15 +384,56 @@
                 console.log("loadRecipeVersions; GetDetailToEdit;", res)
                 if (res.success && res.data.length > 0) {
                     allVersions = res.data;
-                    currentVersionIndex = 0;
-                    currentRecipeId = allVersions[0].RecipeId;
+
+                    // 如果有指定要選擇的RecipeId，找到對應的索引
+                    let targetIndex = 0;
+                    if (selectedRecipeId) {
+                        const foundIndex = allVersions.findIndex(v => v.RecipeId === selectedRecipeId);
+                        if (foundIndex >= 0) {
+                            targetIndex = foundIndex;
+                        }
+                    }
+
+                    currentVersionIndex = targetIndex;
+                    currentRecipeId = allVersions[targetIndex].RecipeId;
 
                     showEditPanel();
-                    loadVersionDetail(0);
+                    setupVersionSelector();
+                    loadVersionDetail(targetIndex);
                 } else {
                     hideEditPanel();
                 }
             });
+        }
+
+        // 設定版本選擇器
+        function setupVersionSelector() {
+            const versionOptions = allVersions.map(version => ({
+                RecipeId: version.RecipeId,
+                VersionDisplay: `v${version.Version} ${version.IsActive ? '(啟用)' : '(停用)'}`
+            }));
+
+            $('#versionSelect').combobox({
+                data: versionOptions,
+                valueField: 'RecipeId',
+                textField: 'VersionDisplay',
+                editable: false,
+                panelHeight: 'auto',
+                onSelect: onVersionSelect
+            });
+
+            // 設定當前選中的版本
+            $('#versionSelect').combobox('select', currentRecipeId);
+        }
+
+        // 版本選擇事件
+        function onVersionSelect(record) {
+            const selectedIndex = allVersions.findIndex(v => v.RecipeId === record.RecipeId);
+            if (selectedIndex >= 0 && selectedIndex !== currentVersionIndex) {
+                currentVersionIndex = selectedIndex;
+                currentRecipeId = record.RecipeId;
+                loadVersionDetail(selectedIndex);
+            }
         }
 
         // 顯示編輯面板
@@ -383,11 +452,11 @@
         function loadVersionDetail(index) {
             const version = allVersions[index];
             console.log('載入版本詳細資料:', version);
+
             const machine = machineList.find(m => m.DeviceID === version.DeviceId);
             $('#displayDeviceName').text(machine ? machine.DeviceName : version.DeviceId);
             $('#displayProdNo').text(version.ProdNo || '-');
             $('#displayMoldNo').text(version.MoldNo || '-');
-            $('#displayVersion').text(`v${version.Version}`);
             $('#editRemark').textbox('setValue', version.Remark || '');
             $('#editIsActive').prop('checked', !!version.IsActive);
             console.log('設定 IsActive 狀態:', version.IsActive);
@@ -412,19 +481,32 @@
 
             $('#paramGrid').datagrid('loadData', paramData);
 
-            // 注意：這裡不需要手動調用 addAlarmFlagClickHandlers
-            // 因為 loadData 會觸發 onLoadSuccess 事件
             setTimeout(() => {
                 $('#paramGrid').datagrid('resize');
                 highlightNewParams();
-                addAlarmFlagClickHandlers(); // 重新綁定事件
+                addAlarmFlagClickHandlers();
             }, 200);
         }
 
+        // 啟用狀態變更事件
+        function onActiveStatusChange() {
+            const isActive = $('#editIsActive').is(':checked');
+            const currentVersion = allVersions[currentVersionIndex];
+
+            if (isActive && !currentVersion.IsActive) {
+                $.messager.confirm('確認',
+                    '啟用此版本將會自動停用同一組合的其他版本，確定要繼續嗎？',
+                    function(r) {
+                        if (!r) {
+                            // 用戶取消，恢復原始狀態
+                            $('#editIsActive').prop('checked', currentVersion.IsActive);
+                        }
+                    }
+                );
+            }
+        }
 
         function addAlarmFlagClickHandlers() {
-        //console.log('添加 AlarmFlag 點擊處理器');
-
             // 移除舊的事件處理器，避免重複綁定
             $('#paramGrid .datagrid-body').off('click.alarmToggle');
 
@@ -440,97 +522,9 @@
                     toggleAlarmFlag(rowIndex);
                 }
             });
-
-            // 添加視覺樣式和提示
-            //$('#paramGrid .datagrid-body td[field="AlarmFlag"]').css({
-            //    'cursor': 'pointer',
-            //    'transition': 'background-color 0.2s',
-            //    'user-select': 'none'
-            //}).attr('title', '點擊切換警報狀態')
-            //    .hover(
-            //        function () { $(this).css('background-color', '#e8f4fd'); },
-            //        function () { $(this).css('background-color', ''); }
-            //    );
         }
 
         // 切換警報旗標
-        // 修正後的 AlarmFlag 點擊處理函數
-
-        //function addAlarmFlagClickHandlers() {
-        //    console.log('開始添加 AlarmFlag 點擊處理器');
-
-        //    setTimeout(() => {
-        //        // 移除舊的事件處理器，避免重複綁定
-        //        $('#paramGrid .datagrid-body').off('click.alarmToggle');
-
-        //        // 方法1：使用更精確的選擇器和事件委派
-        //        $('#paramGrid .datagrid-body').on('click.alarmToggle', 'tr td[field="AlarmFlag"]', function (e) {
-        //            e.preventDefault();
-        //            e.stopPropagation();
-
-        //            console.log('AlarmFlag cell 被點擊');
-
-        //            // 找到對應的行索引
-        //            const $row = $(this).closest('tr');
-        //            const rowIndex = parseInt($row.attr('datagrid-row-index'));
-
-        //            console.log('點擊 AlarmFlag，行索引:', rowIndex);
-
-        //            if (!isNaN(rowIndex)) {
-        //                toggleAlarmFlag(rowIndex);
-        //            }
-        //        });
-
-        //        // 方法2：同時也綁定到 cell 內的內容
-        //        $('#paramGrid .datagrid-body').on('click.alarmToggleIcon', 'td[field="AlarmFlag"] *', function (e) {
-        //            e.preventDefault();
-        //            e.stopPropagation();
-
-        //            console.log('AlarmFlag 內容被點擊');
-
-        //            // 找到對應的行索引
-        //            const $row = $(this).closest('tr');
-        //            const rowIndex = parseInt($row.attr('datagrid-row-index'));
-
-        //            console.log('點擊 AlarmFlag 內容，行索引:', rowIndex);
-
-        //            if (!isNaN(rowIndex)) {
-        //                toggleAlarmFlag(rowIndex);
-        //            }
-        //        });
-
-        //        // 添加樣式和提示
-        //        $('#paramGrid .datagrid-body td[field="AlarmFlag"]').each(function () {
-        //            $(this).css({
-        //                'cursor': 'pointer',
-        //                'transition': 'background-color 0.2s',
-        //                'user-select': 'none'  // 防止文字選取
-        //            }).attr('title', '點擊切換警報狀態')
-        //                .hover(
-        //                    function () {
-        //                        $(this).css('background-color', '#e8f4fd');
-        //                    },
-        //                    function () {
-        //                        $(this).css('background-color', '');
-        //                    }
-        //                );
-        //        });
-
-        //        // 檢查實際渲染的元素
-        //        const alarmCells = $('#paramGrid .datagrid-body td[field="AlarmFlag"]');
-        //        console.log(`找到 ${alarmCells.length} 個 AlarmFlag 欄位`);
-
-        //        // 為了除錯，我們來看看實際的 DOM 結構
-        //        if (alarmCells.length > 0) {
-        //            console.log('第一個 AlarmFlag cell 的 HTML:', alarmCells.first().html());
-        //            console.log('第一個 AlarmFlag cell 的屬性:', alarmCells.first()[0].outerHTML);
-        //        }
-
-        //        console.log('AlarmFlag 點擊處理器添加完成');
-        //    }, 300); // 增加延遲時間，確保 DOM 完全渲染
-        //}
-
-        // 修正後的切換警報旗標函數
         function toggleAlarmFlag(rowIndex) {
             console.log('切換警報旗標，行索引:', rowIndex);
 
@@ -557,7 +551,6 @@
                 }, 300);
             }
         }
-
 
         // 高亮顯示新參數
         function highlightNewParams() {
@@ -602,34 +595,34 @@
         function showSaveOverlay() {
             if ($('#saveOverlay').length === 0) {
                 $('body').append(`
-                            <div id="saveOverlay" style="
-                                display: none;
-                                position: fixed;
-                                top: 0;
-                                left: 0;
-                                width: 100%;
-                                height: 100%;
-                                background-color: rgba(0, 0, 0, 0.5);
-                                z-index: 9999;
-                                justify-content: center;
-                                align-items: center;
-                                font-size: 18px;
-                                color: white;
-                            ">
-                                <div>
-                                    <div style="
-                                        display: inline-block;
-                                        width: 20px;
-                                        height: 20px;
-                                        border: 3px solid rgba(255,255,255,.3);
-                                        border-radius: 50%;
-                                        border-top-color: #fff;
-                                        animation: spin 1s ease-in-out infinite;
-                                    "></div>
-                                    <span style="margin-left: 10px;">儲存中，請稍候...</span>
-                                </div>
-                            </div>
-                        `);
+                    <div id="saveOverlay" style="
+                        display: none;
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background-color: rgba(0, 0, 0, 0.5);
+                        z-index: 9999;
+                        justify-content: center;
+                        align-items: center;
+                        font-size: 18px;
+                        color: white;
+                    ">
+                        <div>
+                            <div style="
+                                display: inline-block;
+                                width: 20px;
+                                height: 20px;
+                                border: 3px solid rgba(255,255,255,.3);
+                                border-radius: 50%;
+                                border-top-color: #fff;
+                                animation: spin 1s ease-in-out infinite;
+                            "></div>
+                            <span style="margin-left: 10px;">儲存中，請稍候...</span>
+                        </div>
+                    </div>
+                `);
             }
             $('#saveOverlay').css('display', 'flex');
         }
@@ -652,8 +645,6 @@
                 startEdit(index, field);
             }
         }
-
-
 
         function startEdit(index, field) {
             $('#paramGrid').datagrid('beginEdit', index);
@@ -716,7 +707,6 @@
                 }
             });
         }
-
 
         function completeEdit() {
             if (editingCell) {
@@ -798,7 +788,6 @@
             }, 100);
         }
 
-
         // 參數編輯結束
         function onParamEndEdit(index, row, changes) {
             console.log('參數編輯結束，行索引:', index, '變更:', changes);
@@ -819,34 +808,6 @@
                 editingCell = null;
             }
         }
-
-        // 添加全域鍵盤快捷鍵（可選）
-        function setupGlobalKeyboardShortcuts() {
-            $(document).on('keydown.paramGrid', function (e) {
-                // 只在沒有其他輸入框 focus 的情況下才處理
-                if (!$('input:focus, textarea:focus').length && !editingCell) {
-                    // 可以添加一些全域快捷鍵，比如：
-                    // F2: 開始編輯第一行第一個欄位
-                    if (e.which === 113) { // F2
-                        const rows = $('#paramGrid').datagrid('getRows');
-                        if (rows.length > 0) {
-                            e.preventDefault();
-                            startEdit(0, editableFields[0]);
-                        }
-                    }
-                }
-            });
-        }
-
-        function cleanupKeyboardEvents() {
-            $(document).off('keydown.paramGrid');
-            $('#paramGrid .datagrid-body').off('keydown.navigation');
-        }
-
-        // 在頁面初始化時設定全域快捷鍵
-        $(function () {
-            setupGlobalKeyboardShortcuts();
-        });
 
         // 計算偏差值
         function calculateBiasValues(index, row) {
@@ -892,9 +853,9 @@
 
             $.messager.confirm('確認',
                 `確定要為以下組合建立新參數配置嗎？<br/>
-                        機台：${$('#filterMachine').combobox('getText')}<br/>
-                        料號：${prodNo}<br/>
-                        模具：${moldNo || '(無)'}`,
+                機台：${$('#filterMachine').combobox('getText')}<br/>
+                料號：${prodNo}<br/>
+                模具：${moldNo || '(無)'}`,
                 function (r) {
                     if (r) {
                         loadRecipeVersions(deviceId, prodNo, '', moldNo)
@@ -970,9 +931,9 @@
                             showType: 'slide'
                         });
 
-                        // 重新載入
+                        // 重新載入版本和清單
                         loadRecipeVersions(currentVersion.DeviceId, currentVersion.ProdNo,
-                            currentVersion.MaterialNo, currentVersion.MoldNo);
+                            currentVersion.MaterialNo, currentVersion.MoldNo, currentRecipeId);
                         applyFilters();
                     } else {
                         $.messager.alert('錯誤', res.message || '儲存失敗');
@@ -990,40 +951,6 @@
             });
         }
 
-        function addAlarmFlagClickHandlersAlternative() {
-            console.log('使用替代方案添加 AlarmFlag 點擊處理器');
-
-            setTimeout(() => {
-                // 直接為每個 AlarmFlag 欄位綁定點擊事件
-                $('#paramGrid .datagrid-body tr').each(function (index) {
-                    const $row = $(this);
-                    const rowIndex = parseInt($row.attr('datagrid-row-index'));
-
-                    if (!isNaN(rowIndex)) {
-                        // 移除舊的事件處理器
-                        $row.find('td[field="AlarmFlag"]').off('click.alarmDirect');
-
-                        // 直接綁定到該 cell
-                        $row.find('td[field="AlarmFlag"]').on('click.alarmDirect', function (e) {
-                            e.preventDefault();
-                            e.stopPropagation();
-
-                            console.log('直接點擊 AlarmFlag，行索引:', rowIndex);
-                            toggleAlarmFlag(rowIndex);
-                        });
-
-                        // 設定樣式
-                        $row.find('td[field="AlarmFlag"]').css({
-                            'cursor': 'pointer',
-                            'user-select': 'none'
-                        }).attr('title', '點擊切換警報狀態');
-                    }
-                });
-
-                console.log('替代方案設定完成');
-            }, 200);
-        }
-
         // 參數表格載入完成後的回調 - 函數名稱要對應 HTML 中的 onLoadSuccess
         function onParamGridLoadSuccess(data) {
             console.log('參數表格載入完成');
@@ -1034,12 +961,16 @@
             }, 100);
         }
 
-
         // 刪除當前Recipe
         function deleteCurrentRecipe() {
             if (currentRecipeId <= 0) return;
 
-            $.messager.confirm('確認', '確定要刪除此版本嗎？此操作無法復原！', function (r) {
+            const currentVersion = allVersions[currentVersionIndex];
+            const versionText = `v${currentVersion.Version} ${currentVersion.IsActive ? '(啟用)' : '(停用)'}`;
+
+            $.messager.confirm('確認',
+                `確定要刪除版本 ${versionText} 嗎？此操作無法復原！`,
+                function (r) {
                 if (r) {
                     // 防止重複提交
                     if (isSaving) {
@@ -1087,7 +1018,7 @@
             if (value) {
                 return '<i class="fa fa-check-circle" style="color:green;" title="此版本已啟用"></i>';
             } else {
-                return '<i class="fa " style="color:gray;" title="此版本已停用"></i>';
+                return '<i class="fa fa-circle-o" style="color:gray;" title="此版本已停用"></i>';
             }
         }
 
@@ -1122,6 +1053,6 @@
                 return `<span style="color: #856404;">${value} <i class="fa fa-plus-circle" title="新增參數"></i></span>`;
             }
             return value;
-        }   
+        }
     </script>
 }

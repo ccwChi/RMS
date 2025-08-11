@@ -9,7 +9,7 @@
 
 <div class="easyui-layout" style="width:100%; height:98%">
     <!-- 左邊：警報群組列表 -->
-    <div data-options="region:'west',split:true" title="警報群組列表" style="width:500px;padding:5px">
+    <div data-options="region:'west',split:true" title="警報群組列表" style="width:60%;padding:5px">
         <table id="groupGrid" class="easyui-datagrid" style="width:100%"
                data-options="
              url:'@Url.Action("GetAlertGroups","AlarmManage")',
@@ -20,9 +20,12 @@
              fitColumns:true">
             <thead>
                 <tr>
-                    <th data-options="field:'GroupName',title:'群組名稱',width:120"></th>
-                    <th data-options="field:'Description',title:'描述',width:150"></th>
-                    <th data-options="field:'IsActive',title:'是否發報',width:60,align:'center',formatter:formatActiveStatus"></th>
+                    <th data-options="field:'RowNumber',title:'序號',width:40,align:'center'">序號</th>
+                    <th data-options="field:'GroupName',title:'警報群組名稱',width:120">警報群組名稱</th>
+                    <th data-options="field:'RoleName',title:'權限角色',width:100">權限角色</th>
+                    <th data-options="field:'MachineGroupDisplay',title:'機台群組',width:200">機台群組</th>
+                    <th data-options="field:'Description',title:'描述',width:120">描述</th>
+                    <th data-options="field:'IsActive',title:'是否發報',width:80,align:'center',formatter:formatActiveStatus">是否發報</th>
                 </tr>
             </thead>
         </table>
@@ -34,10 +37,9 @@
         </div>
     </div>
 
-    <!-- 右邊：分區顯示機台群組管理 -->
+    <!-- 右邊：機台群組管理 -->
     <div data-options="region:'center'" style="padding:0px">
         <div class="easyui-layout" style="width:100%;height:100%">
-            <!-- 機台群組管理 -->
             <div data-options="region:'center',title:'機台群組管理'" style="padding:5px">
                 <table id="machineGroupGrid" class="easyui-datagrid" style="width:100%"
                        data-options="
@@ -50,8 +52,8 @@
                     <thead>
                         <tr>
                             <th data-options="field:'MachineGroupId',hidden:true"></th>
-                            <th data-options="field:'GroupName',title:'群組名稱',width:150"></th>
-                            <th data-options="field:'Description',title:'描述',width:150"></th>
+                            <th data-options="field:'GroupName',title:'群組名稱',width:150">群組名稱</th>
+                            <th data-options="field:'Description',title:'描述',width:150">描述</th>
                         </tr>
                     </thead>
                 </table>
@@ -69,14 +71,13 @@
 <div id="dlgGroup" class="easyui-dialog" closed="true" modal="true" buttons="#dlgGroupBtns"
      style="width:600px;height:550px;padding:10px">
     <form id="formGroup" method="post" style="margin-bottom:10px">
-        <input name="AlertGroupId" type="hidden" />
         <div style="margin-bottom:8px;">
             <label>群組名稱：</label>
-            <input name="GroupName" class="easyui-textbox" required="true" style="width:480px" />
+            <input name="GroupName" id="GroupName" class="easyui-textbox" required="true" style="width:480px" />
         </div>
         <div style="margin-bottom:8px;">
             <label>描述：</label>
-            <input name="Description" class="easyui-textbox" style="width:480px" />
+            <input name="Description" id="Description" class="easyui-textbox" style="width:480px" />
         </div>
         <div style="margin-bottom:8px;">
             <label>選擇角色：</label>
@@ -97,7 +98,7 @@
         </div>
     </form>
 
-    <h4>選擇機台群組（勾選即屬於此警報群組）</h4>
+    <h4>選擇機台群組（可多選，一個角色對應多個機台群組）</h4>
     <table id="alertMachineGroupGrid" class="easyui-datagrid" style="width:100%;height:250px"
            data-options="singleSelect:false,checkbox:true,fitColumns:true">
         <thead>
@@ -152,7 +153,7 @@
     <script>
         let currentMGId = null;
         let currentGroupName = null;
-        let currentGroupId = null;  // 新增這個變數
+        let currentRoleId = null;
 
         $(function(){
             initAlertGroupGrid();
@@ -170,7 +171,7 @@
             }
         }
 
-        // === 警報群組相關功能 ===
+        // ===== 警報群組相關功能 =====
         function initAlertGroupGrid(){
             $('#groupGrid').datagrid({
                 url: '@Url.Action("GetAlertGroups","AlarmManage")',
@@ -185,7 +186,6 @@
             });
         }
 
-        // 初始化警報群組對話框的機台群組選擇表格
         function initAlertGroupDialog(){
             $('#alertMachineGroupGrid').datagrid({
                 singleSelect: false,
@@ -195,13 +195,14 @@
         }
 
         function onGroupSelect(index, row){
-            currentGroupId = row.AlertGroupId;  // 改用 AlertGroupId
-            currentGroupName = row.GroupName;   // 保留名稱用於顯示
-            console.log('選擇警報群組:', currentGroupId, currentGroupName);
+            currentGroupName = row.GroupName;
+            currentRoleId = row.RoleId;
+            console.log('選擇警報群組:', currentGroupName, '角色:', currentRoleId);
         }
 
         function openGroupDlg(){
             currentGroupName = null;
+            currentRoleId = null;
             $('#formGroup').form('clear');
             $('#roleSelect').combobox('clear');
             $('#IsActive').prop('checked', true);
@@ -213,36 +214,100 @@
             const row = $('#groupGrid').datagrid('getSelected');
             if(!row) return $.messager.alert('提示','請先選擇一筆');
 
-            currentGroupId = row.AlertGroupId;  // 改用 AlertGroupId
             currentGroupName = row.GroupName;
-            $('#formGroup').form('load', row);
+            currentRoleId = row.RoleId;
+
+            // 載入基本資料
+            $('#GroupName').textbox('setValue', row.GroupName);
+            $('#Description').textbox('setValue', row.Description);
+            $('#roleSelect').combobox('setValue', row.RoleId);
+            $('#IsActive').prop('checked', !!row.IsActive);
+
             $('#dlgGroup').dialog('open').dialog('setTitle', '編輯警報群組');
 
-            // 載入該警報群組的設定
-            $.get('@Url.Action("GetAlertGroupDetail","AlarmManage")', { alertGroupId: row.AlertGroupId }, res => {
-                if(res.success){
-                    // 設定角色（多選）
-                    if(res.data.RoleIds && res.data.RoleIds.length > 0){
-                        $('#roleSelect').combobox('setValues', res.data.RoleIds);
-                    }
-                    // 設定 IsActive
-                    $('#IsActive').prop('checked', !!res.data.IsActive);
-
-                    // 載入機台群組並選中已選的機台群組
-                    if(res.data.MachineGroupIds && res.data.MachineGroupIds.length > 0){
-                        loadMachineGroupsForAlert(res.data.MachineGroupIds);
-                    } else {
-                        loadMachineGroupsForAlert([]);
-                    }
+            // 載入該警報群組的機台群組設定
+            $.get('@Url.Action("GetAlertGroupDetail","AlarmManage")', {
+                groupName: row.GroupName,
+                roleId: row.RoleId
+            }, res => {
+                if(res.success && res.data){
+                    loadMachineGroupsForAlert(res.data.MachineGroupIds || []);
+                } else {
+                    loadMachineGroupsForAlert([]);
                 }
             });
         }
 
-        // 為警報群組載入機台群組清單
+        function deleteGroup(){
+            const row = $('#groupGrid').datagrid('getSelected');
+            if(!row) return $.messager.alert('提示','請先選擇一筆');
+
+            $.messager.confirm('確認刪除', `確定要刪除警報群組「${row.GroupName}」(${row.RoleName})嗎？`, function(confirmed) {
+                if (!confirmed) return;
+
+                $.ajax({
+                    url: '@Url.Action("DeleteAlertGroups","AlarmManage")',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        GroupName: row.GroupName,
+                        RoleId: row.RoleId
+                    }),
+                    success: function(res) {
+                        if (res.success) {
+                            $('#groupGrid').datagrid('reload');
+                            $.messager.show({
+                                title: '成功',
+                                msg: res.message,
+                                timeout: 3000
+                            });
+                        } else {
+                            $.messager.alert('錯誤', res.message || '刪除失敗');
+                        }
+                    },
+                    error: function() {
+                        $.messager.alert('錯誤', '刪除時發生網路錯誤');
+                    }
+                });
+            });
+        }
+
+        function toggleGroupActive(){
+            const row = $('#groupGrid').datagrid('getSelected');
+            if(!row) return $.messager.alert('提示','請先選擇一筆警報群組');
+
+            const newStatus = !row.IsActive;
+            const statusText = newStatus ? '啟用' : '停用';
+
+            $.messager.confirm('確認', `確定要${statusText}「${row.GroupName}」(${row.RoleName})警報群組？`, function(r){
+                if(r){
+                    $.ajax({
+                        url: '@Url.Action("ToggleAlertGroupsActive","AlarmManage")',
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            GroupName: row.GroupName,
+                            RoleId: row.RoleId,
+                            IsActive: newStatus
+                        }),
+                        success: res => {
+                            if(res.success){
+                                $('#groupGrid').datagrid('reload');
+                                $.messager.show({
+                                    title:'成功',
+                                    msg: res.message
+                                });
+                            } else {
+                                $.messager.alert('錯誤', res.message || '操作失敗');
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
         function loadMachineGroupsForAlert(selectedGroupIds){
             $.get('@Url.Action("GetMachineGroups","AlarmManage")', res => {
-                console.log('載入機台群組:', res);
-                // GetMachineGroups 回傳格式: { total: X, rows: [...] }
                 if(res && res.rows){
                     $('#alertMachineGroupGrid').datagrid('loadData', res.rows);
 
@@ -258,19 +323,15 @@
         }
 
         function saveGroup(){
+            const groupName = $('#GroupName').textbox('getValue');
+            const description = $('#Description').textbox('getValue');
             const roleId = $('#roleSelect').combobox('getValue');
             const selectedMachineGroups = $('#alertMachineGroupGrid').datagrid('getChecked').map(r => r.MachineGroupId);
-            const formData = $('#formGroup').serializeArray();
-            const data = {};
+            const isActive = $('#IsActive').is(':checked');
 
-            formData.forEach(f => data[f.name] = f.value);
-            data.RoleIds = roleId ? [parseInt(roleId)] : [];
-            data.IsActive = $('#IsActive').is(':checked');
-            data.MachineGroupIds = selectedMachineGroups;
-
-            // 新增時 AlertGroupId = 0，編輯時使用現有的 ID
-            data.AlertGroupId = currentGroupId || 0;
-
+            if(!groupName) {
+                return $.messager.alert('提示','請輸入群組名稱');
+            }
             if(!roleId) {
                 return $.messager.alert('提示','請選擇一個角色');
             }
@@ -278,10 +339,18 @@
                 return $.messager.alert('提示','請至少選擇一個機台群組');
             }
 
+            const data = {
+                GroupName: groupName,
+                Description: description,
+                RoleId: parseInt(roleId),
+                MachineGroupIds: selectedMachineGroups,
+                IsActive: isActive
+            };
+
             console.log('送出警報群組資料:', data);
 
-                $.ajax({
-                url: '@Url.Action("SaveGroup","AlarmManage")',
+            $.ajax({
+                url: '@Url.Action("SaveAlertGroups", "AlarmManage")',
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify(data),
@@ -289,6 +358,10 @@
                     if(res.success){
                         $('#dlgGroup').dialog('close');
                         $('#groupGrid').datagrid('reload');
+                        $.messager.show({
+                            title:'成功',
+                            msg: res.message
+                        });
                     } else {
                         $.messager.alert('錯誤', res.message || '儲存失敗');
                     }
@@ -296,62 +369,7 @@
             });
         }
 
-        // 切換啟用/停用狀態
-function toggleGroupActive(){
-    const row = $('#groupGrid').datagrid('getSelected');
-    if(!row) return $.messager.alert('提示','請先選擇一筆警報群組');
-
-    const newStatus = !row.IsActive;
-    const statusText = newStatus ? '啟用' : '停用';
-
-    $.messager.confirm('確認', `確定要${statusText}「${row.GroupName}」警報群組？`, function(r){
-        if(r){
-            $.ajax({
-                url: '@Url.Action("ToggleGroupActive","AlarmManage")',
-                method: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({
-                    AlertGroupId: row.AlertGroupId,  // 改用 AlertGroupId
-                    IsActive: newStatus
-                }),
-                success: res => {
-                    if(res.success){
-                        $('#groupGrid').datagrid('reload');
-                        $.messager.show({
-                            title:'成功',
-                            msg:`警報群組已${statusText}`
-                        });
-                    } else {
-                        $.messager.alert('錯誤', res.message || '操作失敗');
-                    }
-                }
-            });
-        }
-    });
-}
-
-        function deleteGroup(){
-            const row = $('#groupGrid').datagrid('getSelected');
-            if(!row) return $.messager.alert('提示','請先選擇一筆');
-
-            $.messager.confirm('確認','確定刪除這個警報群組？', ok => {
-                if(!ok) return;
-                $.post('@Url.Action("DeleteAlertGroup","AlarmManage")',
-                    { groupName: row.GroupName },
-                    r => {
-                        if(r.success){
-                            $.messager.show({ title:'訊息', msg:'刪除成功' });
-                            $('#groupGrid').datagrid('reload');
-                        } else {
-                            $.messager.alert('錯誤','刪除失敗');
-                        }
-                    },
-                    'json'
-                );
-            });
-        }
-
-        // === 機台群組相關功能（保持不變）===
+        // ===== 機台群組相關功能 =====
         function initMachineGroupGrid(){
             $('#machineGroupGrid').datagrid({
                 url: '@Url.Action("GetMachineGroups","AlarmManage")',
@@ -402,7 +420,6 @@ function toggleGroupActive(){
             });
         }
 
-        // 為機台群組載入機台清單
         function loadMachinesForMG(memberIds){
             $.get('@Url.Action("GetMachineList","MachineManage")', res => {
                 const data = res.data.map(r=>({
@@ -432,7 +449,6 @@ function toggleGroupActive(){
                 contentType: 'application/json',
                 data: JSON.stringify({
                     MachineGroupId: currentMGId || 0,
-                    AlertGroupId: alertGroupId,
                     GroupName: name,
                     Description: desc,
                     Devices: devs
@@ -441,32 +457,110 @@ function toggleGroupActive(){
                     if(res.success){
                         $('#dlgMG').dialog('close');
                         $('#machineGroupGrid').datagrid('reload');
+                        // 如果警報群組對話框是開啟的，也要重新載入機台群組列表
+                        if ($('#dlgGroup').dialog('options').closed === false) {
+                            loadMachineGroupsForAlert([]);
+                        }
+                        $.messager.show({
+                            title:'成功',
+                            msg: res.message
+                        });
                     } else {
-                        $.messager.alert('錯誤','儲存失敗');
+                        $.messager.alert('錯誤', res.message || '儲存失敗');
                     }
                 }
             });
         }
 
-        function deleteGroup(){
-    const row = $('#groupGrid').datagrid('getSelected');
-    if(!row) return $.messager.alert('提示','請先選擇一筆');
+        function deleteMG(){
+            const row = $('#machineGroupGrid').datagrid('getSelected');
+            if(!row) {
+                return $.messager.alert('提示','請先選擇要刪除的機台群組');
+            }
 
-    $.messager.confirm('確認','確定刪除這個警報群組？', ok => {
-        if(!ok) return;
-        $.post('@Url.Action("DeleteAlertGroup","AlarmManage")',
-            { alertGroupId: row.AlertGroupId },  // 改用 AlertGroupId
-            r => {
-                if(r.success){
-                    $.messager.show({ title:'訊息', msg:'刪除成功' });
-                    $('#groupGrid').datagrid('reload');
-                } else {
-                    $.messager.alert('錯誤','刪除失敗');
+            $.ajax({
+                url: '@Url.Action("CheckMachineGroupCanDelete", "AlarmManage")',
+                method: 'GET',
+                dataType: 'json',
+                data: { machineGroupId: row.MachineGroupId },
+                success: function(checkResult) {
+                    if (!checkResult.success) {
+                        $.messager.alert('錯誤', checkResult.message || '檢查刪除條件時發生錯誤');
+                        return;
+                    }
+
+                    let confirmMessage = `確定要刪除機台群組「${row.GroupName}」嗎？`;
+
+                    if (!checkResult.canDelete) {
+                        $.messager.alert('無法刪除', checkResult.reason);
+                        return;
+                    }
+
+                    if (checkResult.reason && checkResult.reason !== '可以安全刪除') {
+                        confirmMessage += `\n\n注意：${checkResult.reason}`;
+                    }
+
+                    $.messager.confirm('確認刪除', confirmMessage, function(confirmed) {
+                        if (!confirmed) return;
+
+                        $.ajax({
+                            url: '@Url.Action("DeleteMachineGroup", "AlarmManage")',
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ id: row.MachineGroupId }),
+                            success: function(res) {
+                                if (res.success) {
+                                    $('#machineGroupGrid').datagrid('reload');
+                                    // 如果警報群組對話框是開啟的，也要重新載入機台群組列表
+                                    if ($('#dlgGroup').dialog('options').closed === false) {
+                                        loadMachineGroupsForAlert([]);
+                                    }
+                                    $.messager.show({
+                                        title: '成功',
+                                        msg: res.message,
+                                        timeout: 3000
+                                    });
+                                } else {
+                                    $.messager.alert('錯誤', res.message || '刪除失敗');
+                                }
+                            },
+                            error: function() {
+                                $.messager.alert('錯誤', '刪除機台群組時發生錯誤');
+                            }
+                        });
+                    });
+                },
+                error: function() {
+                    $.messager.confirm('確認刪除', `確定要刪除機台群組「${row.GroupName}」嗎？`, function(confirmed) {
+                        if (!confirmed) return;
+
+                        $.ajax({
+                            url: '@Url.Action("DeleteMachineGroup", "AlarmManage")',
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ id: row.MachineGroupId }),
+                            success: function(res) {
+                                if (res.success) {
+                                    $('#machineGroupGrid').datagrid('reload');
+                                    if ($('#dlgGroup').dialog('options').closed === false) {
+                                        loadMachineGroupsForAlert([]);
+                                    }
+                                    $.messager.show({
+                                        title: '成功',
+                                        msg: res.message,
+                                        timeout: 3000
+                                    });
+                                } else {
+                                    $.messager.alert('錯誤', res.message || '刪除失敗');
+                                }
+                            },
+                            error: function() {
+                                $.messager.alert('錯誤', '刪除機台群組時發生錯誤');
+                            }
+                        });
+                    });
                 }
-            },
-            'json'
-        );
-    });
-}
+            });
+        }
     </script>
 }

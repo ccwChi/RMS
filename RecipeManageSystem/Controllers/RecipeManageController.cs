@@ -9,6 +9,7 @@ using Newtonsoft.Json;
 using RecipeManageSystem.Generic;
 using RecipeManageSystem.Models;
 using RecipeManageSystem.Repository;
+using RecipeManageSystem.Services;
 
 namespace RecipeManageSystem.Controllers
 {
@@ -159,50 +160,162 @@ namespace RecipeManageSystem.Controllers
 
         [HttpPost]
         [ValidateInput(false)] // 避免 MVC 自動擋掉包含 HTML 的內容
-        [PermissionAuthorize(3)]
+        [PermissionAuthorize(1)]
         public JsonResult SaveRecipe()
         {
-            string json;
-            using (var reader = new StreamReader(Request.InputStream))
+            try
             {
-                Request.InputStream.Position = 0; // 確保從開頭讀
-                json = reader.ReadToEnd();
+                string json;
+                using (var reader = new StreamReader(Request.InputStream))
+                {
+                    Request.InputStream.Position = 0;
+                    json = reader.ReadToEnd();
+                }
+
+                // 改善：加入反序列化錯誤處理
+                RecipeTotalDto dto;
+                try
+                {
+                    dto = JsonConvert.DeserializeObject<RecipeTotalDto>(json);
+                }
+                catch (JsonException ex)
+                {
+                    return Json(new { success = false, message = $"資料格式錯誤：{ex.Message}" });
+                }
+
+                // 改善：參數驗證
+                if (string.IsNullOrWhiteSpace(dto.DeviceId) || string.IsNullOrWhiteSpace(dto.ProdNo))
+                {
+                    return Json(new { success = false, message = "機台代號和料號不能為空" });
+                }
+
+                var currentUser = User as CustomPrincipal;
+                var userName = currentUser?.UserName ?? User.Identity.Name ?? "Unknown";
+
+                // 取得舊資料用於 Log 記錄
+                RecipeTotalDto oldRecipe = null;
+                if (dto.RecipeId > 0 && (dto.Mode == "save" || dto.Mode == "newVersion"))
+                {
+                    oldRecipe = _recipeManage.GetRecipeById(dto.RecipeId);
+                }
+
+                // 儲存配方
+                bool success = _recipeManage.SaveRecipe(dto, dto.Mode, userName);
+
+                if (success)
+                {
+                    try
+                    {
+                        // 根據不同模式記錄 Log
+                        if (dto.RecipeId == 0) // 全新建立
+                        {
+                            // 新建立的配方，RecipeId 在 SaveRecipe 後才會有值
+                            // 這裡我們用其他識別資訊來記錄
+                            var logEntityId = $"{dto.DeviceId}-{dto.ProdNo}-{dto.MoldNo ?? ""}";
+                            LogHelper.LogCreate(
+                                LogTables.RECIPE_HEADER,
+                                logEntityId,
+                                LogModules.RECIPE,
+                                CreateLogObject(dto),
+                                $"新增配方 {dto.DeviceId}-{dto.ProdNo} v{dto.Version}"
+                            );
+                        }
+                        else if (dto.Mode == "save") // 直接修改
+                        {
+                            LogHelper.LogUpdate(
+                                LogTables.RECIPE_HEADER,
+                                dto.RecipeId.ToString(),
+                                LogModules.RECIPE,
+                                CreateLogObject(oldRecipe),
+                                CreateLogObject(dto),
+                                $"修改配方 {dto.DeviceId}-{dto.ProdNo} v{dto.Version}"
+                            );
+                        }
+                        else if (dto.Mode == "newVersion") // 新版本
+                        {
+                            LogHelper.LogCreate(
+                                LogTables.RECIPE_HEADER,
+                                dto.RecipeId.ToString(),
+                                LogModules.RECIPE,
+                                CreateLogObject(dto),
+                                $"新增配方版本 {dto.DeviceId}-{dto.ProdNo} v{dto.Version} (基於 v{oldRecipe?.Version})"
+                            );
+                        }
+                    }
+                    catch (Exception logEx)
+                    {
+                        // Log 記錄失敗不影響主要功能，但可以記錄到系統 Log
+                        System.Diagnostics.Debug.WriteLine($"配方操作 Log 記錄失敗: {logEx.Message}");
+                    }
+                }
+
+                return Json(new
+                {
+                    success,
+                    message = success ? "配方儲存成功" : "配方儲存失敗"
+                });
             }
-
-            // 這裡使用 Json.NET（Newtonsoft.Json）反序列化
-            var dto = JsonConvert.DeserializeObject<RecipeTotalDto>(json);
-
-            var userName = User?.Identity?.Name ?? "Unknown";
-            var ok = _recipeManage.SaveRecipe(dto, dto.Mode, userName);
-
-            return Json(new { success = ok });
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"儲存時發生錯誤：{ex.Message}" });
+            }
         }
 
         /// <summary>
         /// 刪除指定的Recipe版本
         /// </summary>
         [HttpPost]
-        [PermissionAuthorize(7)] // 假設權限ID 7 是刪除權限
+        [PermissionAuthorize(1)] // 刪除權限
         public JsonResult DeleteRecipe(int recipeId)
         {
             try
             {
-                var userName = User?.Identity?.Name ?? "Unknown";
+                // 改善：參數驗證
+                if (recipeId <= 0)
+                {
+                    return Json(new { success = false, message = "無效的配方ID" });
+                }
+
+                // 先取得要刪除的配方資料
+                var recipeToDelete = _recipeManage.GetRecipeById(recipeId);
+                if (recipeToDelete == null)
+                {
+                    return Json(new { success = false, message = "找不到指定的配方" });
+                }
+
+                var currentUser = User as CustomPrincipal;
+                var userName = currentUser?.UserName ?? User.Identity.Name ?? "Unknown";
+
                 var success = _recipeManage.DeleteRecipe(recipeId, userName);
+
+                if (success)
+                {
+                    try
+                    {
+                        // 記錄刪除 Log
+                        LogHelper.LogDelete(
+                            LogTables.RECIPE_HEADER,
+                            recipeId.ToString(),
+                            LogModules.RECIPE,
+                            CreateLogObject(recipeToDelete),
+                            $"刪除配方 {recipeToDelete.DeviceId}-{recipeToDelete.ProdNo} v{recipeToDelete.Version}"
+                        );
+                    }
+                    catch (Exception logEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"配方刪除 Log 記錄失敗: {logEx.Message}");
+                    }
+                }
 
                 return Json(new
                 {
-                    success = success,
-                    message = success ? "刪除成功" : "刪除失敗"
+                    success,
+                    message = success ? "配方已刪除" : "刪除失敗"
                 });
             }
             catch (Exception ex)
             {
-                return Json(new
-                {
-                    success = false,
-                    message = "刪除時發生錯誤：" + ex.Message
-                });
+                return Json(new { success = false, message = $"刪除時發生錯誤：{ex.Message}" });
             }
         }
 
@@ -237,29 +350,84 @@ namespace RecipeManageSystem.Controllers
         /// 切換Recipe版本的啟用/停用狀態
         /// </summary>
         [HttpPost]
-        [PermissionAuthorize(3)] // 使用與儲存相同的權限
+        [PermissionAuthorize(1)]
         public JsonResult ToggleRecipeStatus(int recipeId, bool isActive)
         {
             try
             {
-                var userName = User?.Identity?.Name ?? "Unknown";
+                // 改善：參數驗證
+                if (recipeId <= 0)
+                {
+                    return Json(new { success = false, message = "無效的配方ID" });
+                }
+
+                // 先取得舊資料
+                var oldRecipe = _recipeManage.GetRecipeById(recipeId);
+                if (oldRecipe == null)
+                {
+                    return Json(new { success = false, message = "找不到指定的配方" });
+                }
+
+                var currentUser = User as CustomPrincipal;
+                var userName = currentUser?.UserName ?? User.Identity.Name ?? "Unknown";
+
                 var success = _recipeManage.ToggleRecipeStatus(recipeId, isActive, userName);
+
+                if (success)
+                {
+                    try
+                    {
+                        // 取得更新後的資料並記錄 Log
+                        var newRecipe = _recipeManage.GetRecipeById(recipeId);
+                        LogHelper.LogUpdate(
+                            LogTables.RECIPE_HEADER,
+                            recipeId.ToString(),
+                            LogModules.RECIPE,
+                            CreateLogObject(oldRecipe),
+                            CreateLogObject(newRecipe),
+                            $"{(isActive ? "啟用" : "停用")}配方 {oldRecipe.DeviceId}-{oldRecipe.ProdNo} v{oldRecipe.Version}"
+                        );
+                    }
+                    catch (Exception logEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"配方狀態切換 Log 記錄失敗: {logEx.Message}");
+                    }
+                }
 
                 return Json(new
                 {
-                    success = success,
+                    success,
                     message = success ? (isActive ? "版本已啟用" : "版本已停用") : "狀態切換失敗"
                 });
             }
             catch (Exception ex)
             {
-                return Json(new
-                {
-                    success = false,
-                    message = "狀態切換時發生錯誤：" + ex.Message
-                });
+                return Json(new { success = false, message = $"狀態切換時發生錯誤：{ex.Message}" });
             }
         }
 
+        private object CreateLogObject(RecipeTotalDto recipe)
+        {
+            if (recipe == null) return null;
+
+            return new
+            {
+                recipe.RecipeId,
+                recipe.DeviceId,
+                recipe.ProdNo,
+                recipe.MoldNo,
+                recipe.MaterialNo,
+                recipe.Version,
+                recipe.IsActive,
+                recipe.Remark,
+                ParamCount = recipe.RecipeDetails?.Count ?? 0,
+                // 只記錄有設定標準值的參數摘要
+                ActiveParams = recipe.RecipeDetails?
+                    .Where(d => !string.IsNullOrEmpty(d.StdValue?.ToString()))
+                    .Select(d => new { d.ParamName, d.StdValue, d.AlarmFlag })
+                    .Take(5) // 最多記錄5個參數
+                    .ToList()
+            };
+        }
     }
 }

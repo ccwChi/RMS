@@ -593,6 +593,70 @@ namespace RecipeManageSystem.Repository
             }
         }
 
+        /// <summary>
+        /// 根據 RecipeId 取得配方完整資料
+        /// </summary>
+        /// <param name="recipeId">配方 ID</param>
+        /// <returns>配方資料，找不到時回傳 null</returns>
+        public RecipeTotalDto GetRecipeById(int recipeId)
+        {
+            string headerSql;
+
+            if (EnvFlag == "1")
+            {
+                headerSql = @"
+                    SELECT 
+                        h.RecipeId, h.ProdNo, h.ProdName, h.DeviceId, h.MoldNo, 
+                        h.MaterialNo, h.Version, h.IsActive, h.CreateBy, h.CreateDate, 
+                        h.UpdateBy, h.UpdateDate, h.Remark, m.DeviceName
+                    FROM RecipeHeader h
+                    LEFT JOIN MES.dbo.MES_MACHINE m ON h.DeviceId = m.DeviceID
+                    WHERE h.RecipeId = @RecipeId";
+            }
+            else
+            {
+                headerSql = @"
+                    SELECT 
+                        h.RecipeId, h.ProdNo, h.ProdName, h.DeviceId, h.MoldNo, 
+                        h.MaterialNo, h.Version, h.IsActive, h.CreateBy, h.CreateDate, 
+                        h.UpdateBy, h.UpdateDate, h.Remark, m.DeviceName
+                    FROM RecipeHeader h
+                    LEFT JOIN MES_DEV.dbo.MES_MACHINE m ON h.DeviceId = m.DeviceID
+                    WHERE h.RecipeId = @RecipeId";
+            }
+
+            using (var conn = new SqlConnection(rmsString))
+            {
+
+                var recipe = conn.QueryFirstOrDefault<RecipeTotalDto>(headerSql, new { RecipeId = recipeId });
+
+                if (recipe == null)
+                    return null;
+
+                // 取得配方明細資料
+                const string detailSql = @"
+                    SELECT 
+                        RecipeDetailId,
+                        RecipeId,
+                        ParamId,
+                        ParamName,
+                        StdValue,
+                        MaxValue,
+                        MinValue,
+                        BiasMethod,
+                        BiasValue,
+                        AlarmFlag
+                    FROM RecipeDetail
+                    WHERE RecipeId = @RecipeId
+                    ORDER BY ParamId";
+
+                var details = conn.Query<RecipeDetail>(detailSql, new { RecipeId = recipeId }).ToList();
+                recipe.RecipeDetails = details;
+
+                return recipe;
+            }
+        }
+
 
         // 在 RecipeManageRepository.cs 中新增此方法
         /// <summary>
@@ -611,22 +675,22 @@ namespace RecipeManageSystem.Repository
                         if (isActive)
                         {
                             var recipeInfo = conn.QueryFirstOrDefault(@"
-                        SELECT DeviceId, ProdNo, MaterialNo, MoldNo 
-                        FROM RMS.dbo.RecipeHeader 
-                        WHERE RecipeId = @recipeId",
+                                SELECT DeviceId, ProdNo, MaterialNo, MoldNo 
+                                FROM RecipeHeader 
+                                WHERE RecipeId = @recipeId",
                                 new { recipeId }, tran);
 
                             if (recipeInfo != null)
                             {
                                 // 先將同一組合的其他版本停用
                                 conn.Execute(@"
-                            UPDATE RMS.dbo.RecipeHeader 
-                            SET IsActive = 0 
-                            WHERE DeviceId = @deviceId 
-                              AND ProdNo = @prodNo 
-                              AND ISNULL(MaterialNo, '') = @materialNo 
-                              AND ISNULL(MoldNo, '') = @moldNo
-                              AND RecipeId != @recipeId",
+                                    UPDATE RecipeHeader 
+                                    SET IsActive = 0 
+                                    WHERE DeviceId = @deviceId 
+                                      AND ProdNo = @prodNo 
+                                      AND ISNULL(MaterialNo, '') = @materialNo 
+                                      AND ISNULL(MoldNo, '') = @moldNo
+                                      AND RecipeId != @recipeId",
                                     new
                                     {
                                         deviceId = recipeInfo.DeviceId,
@@ -640,7 +704,7 @@ namespace RecipeManageSystem.Repository
 
                         // 更新目標Recipe的狀態
                         conn.Execute(@"
-                            UPDATE RMS.dbo.RecipeHeader 
+                            UPDATE RecipeHeader 
                             SET IsActive = @isActive, 
                                 UpdateBy = @updateBy, 
                                 UpdateDate = GETDATE() 

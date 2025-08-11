@@ -1,8 +1,10 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Web.Mvc;
 using RecipeManageSystem.Generic;
 using RecipeManageSystem.Models;
 using RecipeManageSystem.Repository;
+using RecipeManageSystem.Services;
 
 namespace RecipeManageSystem.Controllers
 {
@@ -60,21 +62,59 @@ namespace RecipeManageSystem.Controllers
         }
 
         [HttpPost]
-        [PermissionAuthorize(1,2)]
+        [PermissionAuthorize(1, 2)]
         public JsonResult SaveParamDefinition(Parameter parameter)
         {
-            if (parameter.ParamId == 0)
+            try
             {
-                // 這邊可以從 Session 拿目前使用者當 CreatedBy
-                parameter.CreateBy = User.Identity.Name;
-                _param.CreateParameter(parameter);
+                // 改善：參數驗證
+                if (string.IsNullOrWhiteSpace(parameter.ParamName))
+                {
+                    return Json(new { success = false, message = "參數名稱不能為空" });
+                }
+
+                // 改善：統一取得使用者方式
+                var currentUser = User as CustomPrincipal;
+                var userName = currentUser?.UserName ?? User.Identity.Name ?? "system";
+
+                Parameter oldParameter = null;
+                bool isUpdate = parameter.ParamId > 0;
+
+                if (isUpdate)
+                {
+                    // 更新時先取得舊資料
+                    oldParameter = _param.GetParameterById(parameter.ParamId);
+                    if (oldParameter == null)
+                    {
+                        return Json(new { success = false, message = "找不到指定的參數" });
+                    }
+
+                    parameter.UpdateBy = userName;
+                    _param.UpdateParameter(parameter);
+
+                    // 記錄更新 Log
+                    LogHelper.LogParameterOperation("UPDATE", parameter.ParamId, oldParameter, parameter);
+                }
+                else
+                {
+                    // 新增參數
+                    parameter.CreateBy = userName;
+                    _param.CreateParameter(parameter);
+
+                    // 記錄新增 Log
+                    LogHelper.LogParameterOperation("CREATE", parameter.ParamId, null, parameter);
+                }
+
+                return Json(new
+                {
+                    success = true,
+                    message = isUpdate ? "參數已更新" : "參數已新增"
+                });
             }
-            else
+            catch (Exception ex)
             {
-                parameter.UpdateBy = User.Identity.Name;
-                _param.UpdateParameter(parameter);
+                return Json(new { success = false, message = $"儲存失敗：{ex.Message}" });
             }
-            return Json(new { success = true });
         }
     }
 }

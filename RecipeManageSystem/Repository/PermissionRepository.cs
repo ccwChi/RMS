@@ -78,7 +78,112 @@ namespace RecipeManageSystem.Repository
                 }
             }
         }
-        
+
+
+        /// <summary>
+        /// 刪除角色
+        /// </summary>
+        /// <param name="roleId">角色 ID</param>
+        /// <param name="deletedBy">刪除者</param>
+        /// <returns>是否成功</returns>
+        public bool DeleteRole(int roleId, string deletedBy)
+        {
+            using (var conn = new SqlConnection(rmsString))
+            {
+                conn.Open();
+                using (var transaction = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        // 1. 檢查是否有使用者正在使用此角色
+                        const string checkUserSql = @"
+                            SELECT COUNT(*) 
+                            FROM RMS.dbo.Users 
+                            WHERE RoleId = @RoleId AND IsActive = 1";
+
+                        var userCount = conn.QuerySingle<int>(checkUserSql, new { RoleId = roleId }, transaction);
+
+                        if (userCount > 0)
+                        {
+                            // 有使用者正在使用此角色，不允許刪除
+                            transaction.Rollback();
+                            return false;
+                        }
+
+                        // 2. 檢查是否有警報群組使用此角色
+                        const string checkAlertSql = @"
+                            SELECT COUNT(*) 
+                            FROM RMS.dbo.AlertGroup
+                            WHERE RoleId = @RoleId";
+
+                        var alertCount = conn.QuerySingle<int>(checkAlertSql, new { RoleId = roleId }, transaction);
+
+                        if (alertCount > 0)
+                        {
+                            // 先刪除警報群組中的角色關聯
+                            conn.Execute("DELETE FROM RMS.dbo.AlertGroupRole WHERE RoleId = @RoleId",
+                                       new { RoleId = roleId }, transaction);
+                        }
+
+                        // 3. 刪除角色
+                        const string deleteRoleSql = @"
+                            DELETE FROM RMS.dbo.Roles 
+                            WHERE RoleId = @RoleId";
+
+                        var affectedRows = conn.Execute(deleteRoleSql, new { RoleId = roleId }, transaction);
+
+                        transaction.Commit();
+                        return affectedRows > 0;
+                    }
+                    catch (Exception ex)
+                    {
+                        transaction.Rollback();
+                        // 可以記錄錯誤 Log
+                        System.Diagnostics.Debug.WriteLine($"刪除角色失敗: {ex.Message}");
+                        return false;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 檢查角色是否可以被刪除
+        /// </summary>
+        /// <param name="roleId">角色 ID</param>
+        /// <returns>檢查結果</returns>
+        public (bool canDelete, string reason) CanDeleteRole(int roleId)
+        {
+            using (var conn = new SqlConnection(rmsString))
+            {
+                // 檢查是否有使用者正在使用此角色
+                const string checkUserSql = @"
+                    SELECT COUNT(*) 
+                    FROM RMS.dbo.Users 
+                    WHERE RoleId = @RoleId AND IsActive = 1";
+
+                var userCount = conn.QuerySingle<int>(checkUserSql, new { RoleId = roleId });
+
+                if (userCount > 0)
+                {
+                    return (false, $"此角色目前有 {userCount} 個使用者正在使用，無法刪除");
+                }
+
+                // 檢查是否有警報群組使用此角色
+                const string checkAlertSql = @"
+                    SELECT COUNT(*) 
+                    FROM RMS.dbo.AlertGroup
+                    WHERE RoleId = @RoleId";
+
+                var alertCount = conn.QuerySingle<int>(checkAlertSql, new { RoleId = roleId });
+
+                if (alertCount > 0)
+                {
+                    return (true, $"此角色關聯到 {alertCount} 個警報群組，刪除時會一併移除這些關聯");
+                }
+
+                return (true, "可以安全刪除");
+            }
+        }
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

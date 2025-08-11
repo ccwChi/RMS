@@ -6,6 +6,7 @@ using System.Linq;
 using System.Web.Security;
 using System;
 using RecipeManageSystem.Generic;
+using RecipeManageSystem.Services;
 
 namespace RecipeManageSystem.Controllers
 {
@@ -65,18 +66,124 @@ namespace RecipeManageSystem.Controllers
         }
 
         [HttpPost]
-        [PermissionAuthorize(5)]
+        [PermissionAuthorize(4)]
         public JsonResult SaveRole(Role dto)
         {
-            bool success;
-            if (dto.RoleId == 0)
-                success = _permission.InsertRole(dto);
-            else
-                success = _permission.UpdateRole(dto);
+            try
+            {
+                bool success;
+                Role oldRole = null;
 
-            return Json(new { success });
+                if (dto.RoleId != 0)
+                {
+                    // 更新時先取得舊資料
+                    oldRole = _permission.GetRole(dto.RoleId);
+                    success = _permission.UpdateRole(dto);
+
+                    if (success)
+                    {
+                        LogHelper.LogRoleOperation("UPDATE", dto.RoleId, oldRole, dto);
+                    }
+                }
+                else
+                {
+                    success = _permission.InsertRole(dto);
+
+                    if (success)
+                    {
+                        LogHelper.LogRoleOperation("CREATE", dto.RoleId, null, dto);
+                    }
+                }
+
+                return Json(new { success });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
         }
 
+
+        [HttpPost]
+        [PermissionAuthorize(4)] // 使用與編輯相同的權限，或者設定更嚴格的權限
+        public JsonResult DeleteRole(int roleId)
+        {
+            try
+            {
+                // 參數驗證
+                if (roleId <= 0)
+                {
+                    return Json(new { success = false, message = "無效的角色ID" });
+                }
+
+                // 先取得要刪除的角色資料
+                var roleToDelete = _permission.GetRole(roleId);
+                if (roleToDelete == null)
+                {
+                    return Json(new { success = false, message = "找不到指定的角色" });
+                }
+
+                // 檢查是否可以刪除
+                var (canDelete, reason) = _permission.CanDeleteRole(roleId);
+                if (!canDelete)
+                {
+                    return Json(new { success = false, message = reason });
+                }
+
+                // 取得當前操作者資訊
+                var currentUser = User as CustomPrincipal;
+                string operatorUserNo = currentUser?.UserNo ?? "system";
+
+                // 執行刪除（這裡提供兩種選擇）
+                bool result;
+
+                // 選擇1：硬刪除（完全移除）
+                result = _permission.DeleteRole(roleId, operatorUserNo);
+
+                // 選擇2：軟刪除（只是設為非啟用，保留歷史記錄）
+                // result = _permission.SoftDeleteRole(roleId, operatorUserNo);
+
+                if (result)
+                {
+                    // 記錄刪除 Log
+                    LogHelper.LogRoleOperation("DELETE", roleId, roleToDelete, null);
+                }
+
+                return Json(new
+                {
+                    success = result,
+                    message = result ? "角色已成功刪除" : "刪除失敗，請稍後再試"
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = $"刪除時發生錯誤：{ex.Message}" });
+            }
+        }
+
+
+        [HttpGet]
+        public JsonResult CheckCanDeleteRole(int roleId)
+        {
+            try
+            {
+                var (canDelete, reason) = _permission.CanDeleteRole(roleId);
+                return Json(new
+                {
+                    success = true,
+                    canDelete = canDelete,
+                    reason = reason
+                }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = $"檢查失敗：{ex.Message}"
+                }, JsonRequestBehavior.AllowGet);
+            }
+        }
         /////////////////////////////////////////////////////////////////////////////////////////////////////////
         //////////////////////////////////////////////////////////////////
         ///
@@ -112,7 +219,7 @@ namespace RecipeManageSystem.Controllers
 
 
         [HttpPost]
-        [PermissionAuthorize(6)]
+        [PermissionAuthorize(3)]
         public JsonResult SaveUser(User user)
         {
             // 1. 檢查必填
@@ -133,6 +240,7 @@ namespace RecipeManageSystem.Controllers
                 string operatorUserNo = current?.UserNo;
 
                 // 3. 嘗試從資料庫取得這個 UserNo 對應的使用者
+                var oldUser = _permission.GetUser(user.UserNo);
                 bool exists = _permission.ExistsUserByUserNo(user.UserNo);
 
                 if (exists)
@@ -152,6 +260,8 @@ namespace RecipeManageSystem.Controllers
 
                     _permission.UpdateUser(updateUser);
 
+                    LogHelper.LogUserOperation("UPDATE", user.UserNo, oldUser, updateUser);
+
                     return Json(new { success = true, message = "已成功更新使用者。" });
                 }
                 else
@@ -170,6 +280,8 @@ namespace RecipeManageSystem.Controllers
                         CreateBy = operatorUserNo   
                     };
                     bool result =  _permission.AddNewUser(newUser);
+
+                    LogHelper.LogUserOperation("CREATE", user.UserNo, null, newUser);
 
                     return Json(new { success = true, message = "已成功新增使用者。" });
                 }
@@ -201,49 +313,52 @@ namespace RecipeManageSystem.Controllers
         }
 
         [HttpPost]
-        [PermissionAuthorize(7)] // 使用與新增/編輯相同的權限
+        [PermissionAuthorize(3)] // 刪除權限應該更嚴格
         public JsonResult DeleteUser(string userNo)
         {
             try
             {
-                // 1. 檢查必填參數
-                if (string.IsNullOrEmpty(userNo))
+                // 改善：參數驗證
+                if (string.IsNullOrWhiteSpace(userNo))
                 {
                     return Json(new { success = false, message = "使用者工號不能為空" });
                 }
 
-                // 2. 檢查使用者是否存在
-                bool exists = _permission.ExistsUserByUserNo(userNo);
-                if (!exists)
+                // 檢查使用者是否存在，同時取得要刪除的使用者資料
+                var userToDelete = _permission.GetUser(userNo);
+                if (userToDelete == null)
                 {
                     return Json(new { success = false, message = "找不到指定的使用者" });
                 }
 
-                // 3. 取得當前操作者資訊
-                var current = HttpContext.User as CustomPrincipal;
-                string operatorUserNo = current?.UserNo;
+                // 取得當前操作者資訊
+                var currentUser = User as CustomPrincipal;
+                string operatorUserNo = currentUser?.UserNo;
 
-                // 4. 防止自己刪除自己
+                // 防止自己刪除自己
                 if (userNo == operatorUserNo)
                 {
                     return Json(new { success = false, message = "不能刪除自己的帳號" });
                 }
 
-                // 5. 執行刪除
+                // 執行刪除
                 bool result = _permission.DeleteUser(userNo, operatorUserNo);
 
                 if (result)
                 {
-                    return Json(new { success = true, message = "使用者已成功刪除" });
+                    // 記錄刪除 Log
+                    LogHelper.LogUserOperation("DELETE", userNo, userToDelete, null);
                 }
-                else
+
+                return Json(new
                 {
-                    return Json(new { success = false, message = "刪除失敗，請稍後再試" });
-                }
+                    success = result,
+                    message = result ? "使用者已成功刪除" : "刪除失敗，請稍後再試"
+                });
             }
             catch (Exception ex)
             {
-                return Json(new { success = false, message = "刪除時發生錯誤：" + ex.Message });
+                return Json(new { success = false, message = $"刪除時發生錯誤：{ex.Message}" });
             }
         }
 

@@ -18,6 +18,7 @@
             <th data-options="field:'Description',width:80,align:'left'">描述</th>
             <th data-options="field:'Permissions',width:250, align:'left'">權限功能</th>
             <th data-options="field:'IsActive',width:40, align:'left'">是否啟用</th>
+            <th data-options="field:'action',width:80,align:'center'">操作</th>
         </tr>
     </thead>
 </table>
@@ -25,6 +26,7 @@
 <div id="toolbar" style="padding:5px; display:flex; align-items:center">
     <a href="javascript:void(0)" class="custom-easyui-button" onclick="openDialog()">新增</a>
     <a href="javascript:void(0)" class="custom-easyui-button" onclick="editDialog()">編輯</a>
+    <a href="javascript:void(0)" class="custom-easyui-button" onclick="deleteRole()">刪除</a>
 </div>
 
 <!-- 新增/編輯 Dialog -->
@@ -104,11 +106,34 @@
                     },
                     { field: 'RoleName', title: '角色名稱', width: 80, align: 'left' },
                     { field: 'Description', title: '描述', width: 80, align: 'left' },
-                    { field: 'Permissions', title: '權限功能', width: 250, align: 'left', formatter: formatPermissions }
-                ]]
+                    { field: 'Permissions', title: '權限功能', width: 250, align: 'left', formatter: formatPermissions },
+                    {
+                        field: 'action', title: '操作', width: 80, align: 'center',
+                        formatter: function (value, row, index) {
+                            return `
+                                <a href="javascript:void(0)" onclick="editRoleRow(${index})" style="margin-right:10px;">編輯</a>
+                                <a href="javascript:void(0)" onclick="deleteRoleRow(${index})" style="color:red;">刪除</a>
+                            `;
+                        }
+                    }
+                ]],
+                onDblClickRow: function(index, row) {
+                    editRoleRow(index);
+                }
             });
         });
 
+        // 編輯角色（從行操作觸發）
+        function editRoleRow(index) {
+            $('#roleGrid').datagrid('selectRow', index);
+            editDialog();
+        }
+
+        // 刪除角色（從行操作觸發）
+        function deleteRoleRow(index) {
+            $('#roleGrid').datagrid('selectRow', index);
+            deleteRole();
+        }
 
         function formatPermissions(value, row, index) {
             if (!value) return "";
@@ -122,7 +147,6 @@
                 .filter(name => name)                  // 過濾掉空字串
                 .join(', ');                           // 組成 "缺陷管理, 觀看/修改參數紀錄表"
         }
-
 
         // 根據 permissionOptions 產生 checkbox，selected 陣列裡的 id 會被打勾
         function renderPermissionCheckboxes(selected = []) {
@@ -146,7 +170,10 @@
 
         function editDialog() {
             const row = $('#roleGrid').datagrid('getSelected');
-            if (!row) return;
+            if (!row) {
+                $.messager.alert('提示', '請先選擇一個角色');
+                return;
+            }
 
             $.ajax({
                 url: '@Url.Action("GetRole", "Permission")',
@@ -155,7 +182,7 @@
                 data: { id : row.RoleId },
                 success: function (response) {
                     if (!response.success) {
-                        alert('讀取角色資料失敗');
+                        $.messager.alert('錯誤', '讀取角色資料失敗');
                         return;
                     }
 
@@ -182,7 +209,7 @@
                     renderPermissionCheckboxes(selectedPermissions);
                 },
                 error: function () {
-                    alert('讀取角色資料失敗');
+                    $.messager.alert('錯誤', '讀取角色資料失敗');
                 }
             });
         }
@@ -190,11 +217,8 @@
         function saveRole() {
             // 1. 先把 form 裡除了勾選框以外的欄位一併抓出來
             const formData = $('#roleForm').serializeArray();
-            // formData → 例如 [{ name:"RoleId", value:"7" }, { name:"RoleName", value:"工程" }, { name:"Description", value:"123" }]
-            // 注意：不會包含 <input type="checkbox" name="permissions"> 這些勾選框，因為我們稍後手動處理它們。
 
             // 2. 先自行處理「是否啟用」那顆 checkbox
-            //    當 #IsActive 被打勾時，IsActive=true，否則 false
             const IsActiveValue = $('#IsActive').is(':checked');
 
             // 3. 再拿一次所有被打勾的權限 checkbox，轉成 int 陣列，再 join 為逗號字串
@@ -226,41 +250,85 @@
                     if (res.success) {
                         $('#dlg').dialog('close');
                         $('#roleGrid').datagrid('reload');
+                        $.messager.show({
+                            title: '成功',
+                            msg: '角色儲存成功',
+                            timeout: 3000,
+                            showType: 'slide'
+                        });
                     } else {
-                        alert(res.message || '儲存失敗');
+                        $.messager.alert('錯誤', res.message || '儲存失敗');
                     }
                 },
                 error: function () {
-                    alert('儲存角色時發生錯誤');
+                    $.messager.alert('錯誤', '儲存角色時發生錯誤');
                 }
             });
         }
 
-
+        // 刪除角色
         function deleteRole() {
             const row = $('#roleGrid').datagrid('getSelected');
-            if (!row) return;
-
-            if (confirm('確定要刪除此角色嗎？')) {
-                $.ajax({
-                    url: '@Url.Action("Delete", "Permission")',
-                    method: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify({ id: row.RoleId }),
-                    success: function (res) {
-                        if (res.success) {
-                            $('#roleGrid').datagrid('reload');
-                        } else {
-                            alert(res.message || '刪除失敗');
-                        }
-                    },
-                    error: function () {
-                        alert('刪除角色時發生錯誤');
-                    }
-                });
+            if (!row) {
+                $.messager.alert('提示', '請先選擇要刪除的角色');
+                return;
             }
+
+            // 先檢查是否可以刪除
+            $.ajax({
+                url: '@Url.Action("CheckCanDeleteRole", "Permission")',
+                method: 'GET',
+                dataType: 'json',
+                data: { roleId: row.RoleId },
+                success: function (checkResult) {
+                    if (!checkResult.success) {
+                        $.messager.alert('錯誤', checkResult.message || '檢查刪除條件時發生錯誤');
+                        return;
+                    }
+
+                    if (!checkResult.canDelete) {
+                        $.messager.alert('無法刪除', checkResult.reason);
+                        return;
+                    }
+
+                    // 可以刪除，顯示確認對話框
+                    let confirmMessage = `確定要刪除角色「${row.RoleName}」嗎？`;
+                    if (checkResult.reason && checkResult.reason !== '可以安全刪除') {
+                        confirmMessage += `\n\n注意：${checkResult.reason}`;
+                    }
+
+                    $.messager.confirm('確認刪除', confirmMessage, function (confirmed) {
+                        if (!confirmed) return;
+
+                        // 執行刪除
+                        $.ajax({
+                            url: '@Url.Action("DeleteRole", "Permission")',
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ roleId: row.RoleId }),
+                            success: function (res) {
+                                if (res.success) {
+                                    $('#roleGrid').datagrid('reload');
+                                    $.messager.show({
+                                        title: '成功',
+                                        msg: '角色已成功刪除',
+                                        timeout: 3000,
+                                        showType: 'slide'
+                                    });
+                                } else {
+                                    $.messager.alert('錯誤', res.message || '刪除失敗');
+                                }
+                            },
+                            error: function () {
+                                $.messager.alert('錯誤', '刪除角色時發生錯誤');
+                            }
+                        });
+                    });
+                },
+                error: function () {
+                    $.messager.alert('錯誤', '檢查刪除條件時發生錯誤');
+                }
+            });
         }
     </script>
 }
-
-

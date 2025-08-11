@@ -26,9 +26,25 @@ namespace RecipeManageSystem.Repository
         }
         public List<MachineParameterView> GetAllMappings()
         {
-            using (var conn = new SqlConnection(rmsString))
+            string sql;
+
+            if (EnvFlag == "1")
             {
-                string sql = @"
+                sql = @"
+                    SELECT 
+                        mp.MappingId,
+                        mp.DeviceId,
+                        mp.ParamId,
+                        m.DeviceName,
+                        p.ParamName
+                    FROM RMS.dbo.MachineParameter mp
+                    LEFT JOIN MES.dbo.MES_MACHINE m ON mp.DeviceId = m.DeviceID
+                    LEFT Parameter p ON mp.ParamId = p.ParamId
+                    Order by m.MpsSectionNo, mp.DeviceID ";
+            }
+            else
+            {
+                sql = @"
                     SELECT 
                         mp.MappingId,
                         mp.DeviceId,
@@ -37,9 +53,12 @@ namespace RecipeManageSystem.Repository
                         p.ParamName
                     FROM RMS.dbo.MachineParameter mp
                     LEFT JOIN MES_DEV.dbo.MES_MACHINE m ON mp.DeviceId = m.DeviceID
-                    LEFT JOIN RMS.dbo.Parameter p ON mp.ParamId = p.ParamId
+                    LEFT Parameter p ON mp.ParamId = p.ParamId
                     Order by m.MpsSectionNo, mp.DeviceID ";
-                    
+            }
+
+            using (var conn = new SqlConnection(rmsString))
+            {       
                 return conn.Query<MachineParameterView>(sql).ToList();
             }
         }
@@ -77,7 +96,7 @@ namespace RecipeManageSystem.Repository
         {
             using (var conn = new SqlConnection(rmsString))
             {
-                var sql = "UPDATE RMS.dbo.MachineParameter SET DeviceId=@DeviceId, ParamId=@ParamId WHERE MappingId=@MappingId";
+                var sql = "UPDATE MachineParameter SET DeviceId=@DeviceId, ParamId=@ParamId WHERE MappingId=@MappingId";
                 return conn.Execute(sql, data) > 0;
             }
         }
@@ -87,7 +106,7 @@ namespace RecipeManageSystem.Repository
             using (var conn = new SqlConnection(rmsString))
             {
                 return conn.QueryFirstOrDefault<string>(
-                    "SELECT DeviceId FROM RMS.dbo.MachineParameter WHERE MappingId = @mappingId",
+                    "SELECT DeviceId MachineParameter WHERE MappingId = @mappingId",
                     new { mappingId }
                 );
             }
@@ -98,7 +117,7 @@ namespace RecipeManageSystem.Repository
             using (var conn = new SqlConnection(rmsString))
             {
                 return conn.Query<int>(
-                    "SELECT ParamId FROM RMS.dbo.MachineParameter WHERE DeviceId = @deviceId",
+                    "SELECT ParamId FROM MachineParameter WHERE DeviceId = @deviceId",
                     new { deviceId }
                 ).ToList();
             }
@@ -106,9 +125,25 @@ namespace RecipeManageSystem.Repository
 
         public List<MachineParameterView> GetMappingList()
         {
-            using (var conn = new SqlConnection(rmsString))
+            string sql;
+
+            if (EnvFlag == "1")
             {
-                string sql = @"
+                sql = @"
+                    SELECT 
+                        mp.MappingId,
+                        mp.DeviceId,
+                        mp.ParamId,
+                        m.DeviceName,
+                        p.ParamName
+                    FROM RMS.dbo.MachineParameter mp
+                    LEFT JOIN MES.dbo.MES_MACHINE m ON mp.DeviceId = m.DeviceID
+                    LEFT JOIN Parameter p ON mp.ParamId = p.ParamId
+                    Order by m.MpsSectionNo, mp.DeviceID ";
+            }
+            else
+            {
+                sql = @"
                     SELECT 
                         mp.MappingId,
                         mp.DeviceId,
@@ -117,9 +152,11 @@ namespace RecipeManageSystem.Repository
                         p.ParamName
                     FROM RMS.dbo.MachineParameter mp
                     LEFT JOIN MES_DEV.dbo.MES_MACHINE m ON mp.DeviceId = m.DeviceID
-                    LEFT JOIN RMS.dbo.Parameter p ON mp.ParamId = p.ParamId
+                    LEFT JOIN Parameter p ON mp.ParamId = p.ParamId
                     Order by m.MpsSectionNo, mp.DeviceID ";
-
+            }
+            using (var conn = new SqlConnection(rmsString))
+            {
                 return conn.Query<MachineParameterView>(sql).ToList();
             }
         }

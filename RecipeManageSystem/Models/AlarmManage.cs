@@ -5,38 +5,65 @@ using System.Web;
 
 namespace RecipeManageSystem.Models
 {
-    public class AlertUser
-    {
-        public int AlertId { get; set; }
-        public string UserNo { get; set; }
-        public string CreateBy { get; set; }
-        public DateTime CreateDate { get; set; }
-    }
+    //public class AlertUser
+    //{
+    //    public int AlertId { get; set; }
+    //    public string UserNo { get; set; }
+    //    public string CreateBy { get; set; }
+    //    public DateTime CreateDate { get; set; }
+    //}
 
     public class AlertGroupDto
     {
         public int AlertGroupId { get; set; }
         public string GroupName { get; set; }
         public string Description { get; set; }
-        public int RoleId { get; set; }  // 改為單一角色
-        public List<int> MachineGroupIds { get; set; } = new List<int>(); // 新增機台群組清單
-        public bool IsActive { get; set; } = true;  // 新增：是否啟用發報
+        public int MachineGroupId { get; set; }  // 保留向後相容
+        public bool IsActive { get; set; }
         public string CreateBy { get; set; }
         public DateTime CreateDate { get; set; }
         public string UpdateBy { get; set; }
         public DateTime UpdateDate { get; set; }
+        public List<int> RoleIds { get; set; } = new List<int>();
+        public List<int> MachineGroupIds { get; set; } = new List<int>();
     }
 
-    // 新增用於編輯時取得詳細資料的 DTO
-    public class AlertGroupDetailDto
+
+    public class AlertGroupSummaryDto
     {
         public int AlertGroupId { get; set; }
         public string GroupName { get; set; }
         public string Description { get; set; }
-        public int? RoleId { get; set; }
-        public bool IsActive { get; set; } = true;  // 新增：是否啟用發報
+        public int MachineGroupId { get; set; }
+        public bool IsActive { get; set; }
+        public string CreateBy { get; set; }
+        public DateTime CreateDate { get; set; }
+        public string UpdateBy { get; set; }
+        public DateTime UpdateDate { get; set; }
+        public string RoleIds { get; set; } // 逗號分隔的角色ID字串
+
+        // 輔助屬性：轉換成角色ID列表
+        public List<int> RoleIdList
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(RoleIds)) return new List<int>();
+                return RoleIds.Split(',').Select(int.Parse).ToList();
+            }
+        }
+    }
+
+    public class AlertGroupDetailDto
+    {
+        public int AlertGroupId { get; set; }  // 新增
+        public string GroupName { get; set; }
+        public string Description { get; set; }
+        public bool IsActive { get; set; }
+        public int MachineGroupId { get; set; }
+        public List<int> RoleIds { get; set; } = new List<int>();
         public List<int> MachineGroupIds { get; set; } = new List<int>();
     }
+
 
 
     public class AlertGroupDeviceDto
@@ -74,7 +101,6 @@ namespace RecipeManageSystem.Models
         public DateTime CreateDate { get; set; }
         public string UpdateBy { get; set; }
         public DateTime UpdateDate { get; set; }
-
     }
 
     public class MachineGroupWithDevices
@@ -82,8 +108,8 @@ namespace RecipeManageSystem.Models
         public int MachineGroupId { get; set; }
         public string GroupName { get; set; }
         public string Description { get; set; }
-        public string DeviceList { get; set; }  
-        public int DeviceCount { get; set; }    
+        public string DeviceList { get; set; }
+        public int DeviceCount { get; set; }
     }
 }
 

@@ -26,7 +26,7 @@ namespace RecipeManageSystem.Repository
         {
             using (var conn = new SqlConnection(rmsString))
             {
-                return conn.Query<Role>("SELECT RoleId, RoleName, Description, Permissions, IsActive FROM RMS.dbo.Roles").ToList();
+                return conn.Query<Role>("SELECT RoleId, RoleName, Description, Permissions, IsActive FROM RMS.dbo.Roles order by RoleId").ToList();
             }
         }
 
@@ -99,7 +99,7 @@ namespace RecipeManageSystem.Repository
         {
             using (var conn = new SqlConnection(rmsString))
             {
-                return conn.Query<User>("SELECT UserNo, UserName, DepartmentName,Email, RoleId, IsActive, ReciveAlarmFlag , CreateDate FROM RMS.dbo.Users").ToList();
+                return conn.Query<User>("SELECT UserNo, UserName, DepartmentName,Email, RoleId, IsActive, ReciveAlarmFlag , CreateDate FROM RMS.dbo.Users order by UserNo").ToList();
             }
         }
 
@@ -107,7 +107,7 @@ namespace RecipeManageSystem.Repository
         {
             using (var conn = new SqlConnection(rmsString))
             {
-                return conn.Query<Role>("SELECT RoleId, RoleName, Description, Permissions, IsActive FROM RMS.dbo.Roles").ToList();
+                return conn.Query<Role>("SELECT RoleId, RoleName, Description, Permissions, IsActive FROM RMS.dbo.Roles order by RoleId").ToList();
             }
         }
 

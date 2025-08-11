@@ -62,16 +62,9 @@ namespace RecipeManageSystem.Controllers
         }
 
         [HttpGet]
-        public JsonResult GetAlertGroupRoles(int id)
-        {
-            var roleIds = _alarmManage.GetAlertGroupRoles(id); // 取得 List<int>
-            return Json(new { success = true, data = roleIds }, JsonRequestBehavior.AllowGet);
-        }
-
-        [HttpGet]
         public JsonResult GetAlertGroups()
         {
-            var groups = _alarmManage.GetAlertGroups(); // 需要在 Repository 中實作
+            var groups = _alarmManage.GetAlertGroups();
             return Json(new
             {
                 success = true,
@@ -80,11 +73,10 @@ namespace RecipeManageSystem.Controllers
             }, JsonRequestBehavior.AllowGet);
         }
 
-
         [HttpGet]
-        public JsonResult GetAlertGroupDetail(int id)
+        public JsonResult GetAlertGroupDetail(int alertGroupId)
         {
-            var detail = _alarmManage.GetAlertGroupDetail(id);
+            var detail = _alarmManage.GetAlertGroupDetail(alertGroupId);
             return Json(new
             {
                 success = true,
@@ -124,13 +116,12 @@ namespace RecipeManageSystem.Controllers
 
 
         [HttpPost]
-        public JsonResult DeleteAlertGroup(int id)
+        public JsonResult DeleteAlertGroup(int alertGroupId)
         {
-            var ok = _alarmManage.DeleteAlertGroup(id);
+            var ok = _alarmManage.DeleteAlertGroup(alertGroupId);
             return Json(new { success = ok });
         }
 
-        // 修改現有的 SaveGroup 方法
         [HttpPost]
         public JsonResult SaveGroup(AlertGroupDto dto)
         {

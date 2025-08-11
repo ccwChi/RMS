@@ -88,11 +88,11 @@ namespace RecipeManageSystem.Repository
             using (var conn = new SqlConnection(mesString))
             {
                 string sql = @"
-                    SELECT mu.UserNo as EngineerNo, mu.UserName as EngineerName, mu.DepartmentNo, mu.DepartmentName, md.FatherDepartmentNo, md.FatherDepartmentName, mu.Email 
-                    FROM MES_USERS mu
-                    INNER JOIN MES_DEPARTMENT md  on mu.DepartmentNo =  md.DepartmentNo
-                    where mu.ExpirationDate is null
-                    and md.FatherDepartmentName like '%製造%'";
+                        SELECT mu.UserNo as EngineerNo, mu.UserName as EngineerName, mu.DepartmentNo, mu.DepartmentName, md.FatherDepartmentNo, md.FatherDepartmentName, mu.Email 
+                        FROM MES_USERS mu
+                        INNER JOIN MES_DEPARTMENT md  on mu.DepartmentNo =  md.DepartmentNo
+                        where mu.ExpirationDate is null
+                        and md.FatherDepartmentName in ('製造一部', '製造四部')";
 
                 return conn.Query<Engineer>(sql).ToList();
             }

@@ -17,9 +17,9 @@ namespace RecipeManageSystem.Repository
         {
             const string sql = @"
             SELECT
-              MachineGroupId,
-              MAX(GroupName)   AS GroupName,
-              MAX(Description) AS Description
+            MachineGroupId,
+            MAX(GroupName)   AS GroupName,
+            MAX(Description) AS Description
             FROM RMS.dbo.MachineGroup
             GROUP BY MachineGroupId
             ORDER BY MachineGroupId";
@@ -34,15 +34,15 @@ namespace RecipeManageSystem.Repository
         public List<MachineGroupWithDevices> GetMachineGroupsWithDevices()
         {
             const string sql = @"
-                        SELECT
-                          MachineGroupId,
-                          MAX(GroupName)   AS GroupName,
-                          MAX(Description) AS Description,
-                          STRING_AGG(DeviceId, ', ') AS DeviceList,
-                          COUNT(DeviceId) AS DeviceCount
-                        FROM RMS.dbo.MachineGroup
-                        GROUP BY MachineGroupId
-                        ORDER BY MachineGroupId";
+                            SELECT
+                            MachineGroupId,
+                            MAX(GroupName)   AS GroupName,
+                            MAX(Description) AS Description,
+                            STRING_AGG(DeviceId, ', ') AS DeviceList,
+                            COUNT(DeviceId) AS DeviceCount
+                            FROM RMS.dbo.MachineGroup
+                            GROUP BY MachineGroupId
+                            ORDER BY MachineGroupId";
 
             using (var conn = new SqlConnection(rmsString))
             {
@@ -136,57 +136,63 @@ namespace RecipeManageSystem.Repository
             }
         }
 
-        // 在 AlarmManageRepository.cs 中需要補充的方法
 
-        public List<AlertGroupDto> GetAlertGroups()
+
+        public List<AlertGroupSummaryDto> GetAlertGroups()
         {
             const string sql = @"
-                        SELECT 
-                            ag.AlertGroupId, 
-                            ag.GroupName, 
-                            ag.Description, 
-                            ag.IsActive,
-                            ag.CreateBy, 
-                            ag.CreateDate, 
-                            ag.UpdateBy, 
-                            ag.UpdateDate,
-                            agr.RoleId
-                        FROM RMS.dbo.AlertGroup ag
-                        LEFT JOIN RMS.dbo.AlertGroupRole agr ON ag.AlertGroupId = agr.AlertGroupId
-                        ORDER BY ag.AlertGroupId";
+                SELECT 
+                    MIN(ag.AlertGroupId) AS AlertGroupId,
+                    ag.GroupName, 
+                    ag.Description,
+                    ag.MachineGroupId,
+                    ag.IsActive,
+                    MIN(ag.CreateBy) AS CreateBy, 
+                    MIN(ag.CreateDate) AS CreateDate, 
+                    MIN(ag.UpdateBy) AS UpdateBy, 
+                    MIN(ag.UpdateDate) AS UpdateDate,
+                    STRING_AGG(CAST(ag.RoleId AS VARCHAR), ',') AS RoleIds
+                FROM RMS.dbo.AlertGroup ag
+                GROUP BY ag.GroupName, ag.Description, ag.MachineGroupId, ag.IsActive
+                ORDER BY MIN(ag.AlertGroupId)";
 
             using (var conn = new SqlConnection(rmsString))
             {
-                return conn.Query<AlertGroupDto>(sql).ToList();
+                return conn.Query<AlertGroupSummaryDto>(sql).ToList();
             }
         }
-
 
         public AlertGroupDetailDto GetAlertGroupDetail(int alertGroupId)
         {
             using (var conn = new SqlConnection(rmsString))
             {
-                // 取得基本資料和角色
-                const string sqlBasic = @"
-                    SELECT 
-                        ag.AlertGroupId, 
-                        ag.GroupName, 
-                        ag.Description,
-                        ag.IsActive,
-                        agr.RoleId
-                    FROM RMS.dbo.AlertGroup ag
-                    LEFT JOIN RMS.dbo.AlertGroupRole agr ON ag.AlertGroupId = agr.AlertGroupId
-                    WHERE ag.AlertGroupId = @alertGroupId";
+                const string sql = @"
+            SELECT TOP 1
+                ag.AlertGroupId,
+                ag.GroupName, 
+                ag.Description,
+                ag.IsActive,
+                ag.MachineGroupId
+            FROM RMS.dbo.AlertGroup ag
+            WHERE ag.AlertGroupId = @alertGroupId";
 
-                var detail = conn.QueryFirstOrDefault<AlertGroupDetailDto>(sqlBasic, new { alertGroupId });
+                var detail = conn.QueryFirstOrDefault<AlertGroupDetailDto>(sql, new { alertGroupId });
 
                 if (detail != null)
                 {
+                    // 取得對應的角色
+                    const string sqlRoles = @"
+                SELECT DISTINCT RoleId 
+                FROM RMS.dbo.AlertGroup 
+                WHERE AlertGroupId = @alertGroupId";
+
+                    detail.RoleIds = conn.Query<int>(sqlRoles, new { alertGroupId }).ToList();
+
                     // 取得對應的機台群組
                     const string sqlMachineGroups = @"
-                        SELECT MachineGroupId 
-                        FROM RMS.dbo.AlertGroupMachineGroup 
-                        WHERE AlertGroupId = @alertGroupId";
+                SELECT DISTINCT MachineGroupId 
+                FROM RMS.dbo.AlertGroup 
+                WHERE AlertGroupId = @alertGroupId";
 
                     detail.MachineGroupIds = conn.Query<int>(sqlMachineGroups, new { alertGroupId }).ToList();
                 }
@@ -194,7 +200,6 @@ namespace RecipeManageSystem.Repository
                 return detail;
             }
         }
-
 
         public void SaveAlertGroup(AlertGroupDto dto, string user)
         {
@@ -205,65 +210,41 @@ namespace RecipeManageSystem.Repository
                 {
                     try
                     {
-                        var id = dto.AlertGroupId;
-
-                        if (id == 0)
+                        // 如果是新增，取得新的 AlertGroupId
+                        int alertGroupId = dto.AlertGroupId;
+                        if (alertGroupId == 0)
                         {
-                            // 新增：讓 IDENTITY 自動產生 ID
-                            const string insertSql = @"
-                        INSERT INTO RMS.dbo.AlertGroup (GroupName, Description, IsActive, CreateBy, CreateDate)
-                        VALUES (@GroupName, @Description, @IsActive, @CreateBy, GETDATE());
-                        SELECT CAST(SCOPE_IDENTITY() AS int);";
+                            alertGroupId = conn.QuerySingle<int>(
+                                "SELECT ISNULL(MAX(AlertGroupId), 0) + 1 FROM RMS.dbo.AlertGroup",
+                                transaction: tx);
+                        }
 
-                            id = conn.QuerySingle<int>(insertSql, new
+                        // 刪除舊記錄（使用 AlertGroupId）
+                        conn.Execute(@"DELETE FROM RMS.dbo.AlertGroup WHERE AlertGroupId = @AlertGroupId",
+                            new { AlertGroupId = alertGroupId }, tx);
+
+                        // 插入新記錄
+                        const string insertSql = @"
+                    INSERT INTO RMS.dbo.AlertGroup 
+                    (GroupName, Description, MachineGroupId, RoleId, IsActive, CreateBy, CreateDate)
+                    VALUES 
+                    (@GroupName, @Description, @MachineGroupId, @RoleId, @IsActive, @CreateBy, GETDATE())";
+
+                        foreach (var roleId in dto.RoleIds ?? new List<int>())
+                        {
+                            foreach (var machineGroupId in dto.MachineGroupIds ?? new List<int>())
                             {
-                                dto.GroupName,
-                                dto.Description,
-                                dto.IsActive,
-                                CreateBy = user
-                            }, tx);
-                        }
-                        else
-                        {
-                            // 編輯：先刪除舊的關聯記錄，再更新主記錄
-                            conn.Execute(@"DELETE FROM RMS.dbo.AlertGroupRole WHERE AlertGroupId=@id", new { id }, tx);
-                            conn.Execute(@"DELETE FROM RMS.dbo.AlertGroupMachineGroup WHERE AlertGroupId=@id", new { id }, tx);
-
-                            // 更新 AlertGroup
-                            conn.Execute(@"
-                        UPDATE RMS.dbo.AlertGroup 
-                        SET GroupName = @GroupName, 
-                            Description = @Description, 
-                            IsActive = @IsActive,
-                            UpdateBy = @UpdateBy, 
-                            UpdateDate = GETDATE()
-                        WHERE AlertGroupId = @AlertGroupId",
-                            new
-                            {
-                                dto.GroupName,
-                                dto.Description,
-                                dto.IsActive,
-                                UpdateBy = user,
-                                AlertGroupId = id
-                            }, tx);
-                        }
-
-                        // 插入 AlertGroupRole（一對一）
-                        if (dto.RoleId > 0)
-                        {
-                            conn.Execute(@"
-                        INSERT INTO RMS.dbo.AlertGroupRole (AlertGroupId, RoleId, CreateBy, CreateDate)
-                        VALUES (@AlertGroupId, @RoleId, @CreateBy, GETDATE())",
-                                new { AlertGroupId = id, RoleId = dto.RoleId, CreateBy = user }, tx);
-                        }
-
-                        // 插入 AlertGroupMachineGroup（一對多）
-                        foreach (var machineGroupId in dto.MachineGroupIds ?? new List<int>())
-                        {
-                            conn.Execute(@"
-                        INSERT INTO RMS.dbo.AlertGroupMachineGroup (AlertGroupId, MachineGroupId, CreateBy, CreateDate)
-                        VALUES (@AlertGroupId, @MachineGroupId, @CreateBy, GETDATE())",
-                                new { AlertGroupId = id, MachineGroupId = machineGroupId, CreateBy = user }, tx);
+                                conn.Execute(insertSql, new
+                                {
+                                    AlertGroupId = alertGroupId,
+                                    dto.GroupName,
+                                    dto.Description,
+                                    MachineGroupId = machineGroupId,
+                                    RoleId = roleId,
+                                    dto.IsActive,
+                                    CreateBy = user
+                                }, tx);
+                            }
                         }
 
                         tx.Commit();
@@ -282,11 +263,11 @@ namespace RecipeManageSystem.Repository
             using (var conn = new SqlConnection(rmsString))
             {
                 const string sql = @"
-                    UPDATE RMS.dbo.AlertGroup 
-                    SET IsActive = @IsActive, 
-                        UpdateBy = @UpdateBy, 
-                        UpdateDate = GETDATE()
-                    WHERE AlertGroupId = @AlertGroupId";
+            UPDATE RMS.dbo.AlertGroup 
+            SET IsActive = @IsActive, 
+                UpdateBy = @UpdateBy, 
+                UpdateDate = GETDATE()
+            WHERE AlertGroupId = @AlertGroupId";
 
                 var rowsAffected = conn.Execute(sql, new
                 {
@@ -303,38 +284,20 @@ namespace RecipeManageSystem.Repository
         {
             using (var conn = new SqlConnection(rmsString))
             {
-                conn.Open();
-                using (var tx = conn.BeginTransaction())
+                try
                 {
-                    try
-                    {
-                        // 先刪除關聯的記錄（CASCADE 應該會自動處理，但手動刪除更安全）
-                        conn.Execute("DELETE FROM RMS.dbo.AlertGroupRole WHERE AlertGroupId = @id",
-                            new { id = alertGroupId }, tx);
+                    var rowsAffected = conn.Execute(
+                        "DELETE FROM RMS.dbo.AlertGroup WHERE AlertGroupId = @alertGroupId",
+                        new { alertGroupId });
 
-                        conn.Execute("DELETE FROM RMS.dbo.AlertGroupMachineGroup WHERE AlertGroupId = @id",
-                            new { id = alertGroupId }, tx);
-
-                        // 再刪除群組本身
-                        conn.Execute("DELETE FROM RMS.dbo.AlertGroup WHERE AlertGroupId = @id",
-                            new { id = alertGroupId }, tx);
-
-                        tx.Commit();
-                        return true;
-                    }
-                    catch
-                    {
-                        tx.Rollback();
-                        return false;
-                    }
+                    return rowsAffected > 0;
+                }
+                catch
+                {
+                    return false;
                 }
             }
         }
-
-
-
-
-
     }
 
 }
